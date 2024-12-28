@@ -1,0 +1,1 @@
+pub const CHAIN_ID : u64 = 9496;
