@@ -1,9 +1,9 @@
 pub mod utils;
-use crate::utils::evm::{create_bundle, create_parallel_bundle};
+use crate::utils::evm::{create_bundle};
 
 #[tokio::main]
 async fn main() {
 
     println!("Hello, world!");
-    create_parallel_bundle(1, 400_000).await.unwrap() // 840_000
+    create_bundle(0, 5_000_000, Option::None).await.unwrap() // 840_000
 }

@@ -45,8 +45,9 @@ pub async fn create_and_sign_legacy_tx(size: usize) -> Result<(TxEnvelope)> {
     Ok(tx_envelope)
 }
 
-pub async fn broadcast_bundle(envelopes: Vec<u8>, provider: &RootProvider<Http<Client>>) -> Result<()> {
-    let signer : PrivateKeySigner = get_env_key("PRIV_KEY".to_string())?.parse()?;
+pub async fn broadcast_bundle(envelopes: Vec<u8>, provider: &RootProvider<Http<Client>>, private_key: Option<String>) -> Result<()> {
+    let pk = private_key.unwrap_or(get_env_key("PRIV_KEY".to_string())?);
+    let signer : PrivateKeySigner = pk.parse()?;
     let wallet = EthereumWallet::from(signer.clone());
     let nonce = provider.get_transaction_count(signer.clone().address()).await?;
 
@@ -64,35 +65,6 @@ pub async fn broadcast_bundle(envelopes: Vec<u8>, provider: &RootProvider<Http<C
     println!("{:?}", tx);
     Ok(())
 }
-pub async fn create_bundle(envelope_input_size: usize, envelopes_count: u32) -> Result<()> {
-
-    let mut envelopes : Vec<TxEnvelopeWrapper> = vec![];
-    let provider = create_evm_http_client("https://testnet-rpc.wvm.dev").await?;
-    for i in 0..envelopes_count {
-        let tx = create_and_sign_legacy_tx(envelope_input_size).await?;
-        let wrapped_envelope = TxEnvelopeWrapper::from_envelope(tx);
-        envelopes.push(wrapped_envelope);
-        println!("created tx count {}", i);
-    }
-    println!("finished creating txs");
-    // println!("{:#?}", &envelopes);
-    let bundle = Bundle::from(envelopes.clone());
-    println!("created bundle");
-
-    // println!("{:#?}", bundle);
-    let serialized = TxEnvelopeWrapper::borsh_ser(&bundle);
-    println!("borsh serialized");
-    let mut input = Cursor::new(&serialized);
-    let compressed = TxEnvelopeWrapper::brotli_compress_stream(&mut input);
-    println!("brotli compressed");
-    println!("\nENVELOPES COUNT IN THE BUNDLED TX -- COUNT: {:?} ; INPUT SIZE (BYTE): {:?}", envelopes.len(), envelope_input_size );
-    println!("ORIGINAL ENVELOPES BUNDLE SIZE (BYTES): {:?}", serde_json::to_vec(&bundle).unwrap().len());
-    println!("FINAL ENVELOPES BUNDLE SIZE (BYTES): {:?}", compressed.len());
-
-    broadcast_bundle(compressed, &provider).await?;
-
-    Ok(())
-}
 
 fn generate_random_eth_tx_input(byte_len: usize) -> String {
     // Create a buffer with `byte_len` capacity
@@ -106,7 +78,7 @@ fn generate_random_eth_tx_input(byte_len: usize) -> String {
     x
 }
 
-pub async fn create_parallel_bundle(envelope_input_size: usize, envelopes_count: u32) -> Result<()> {
+pub async fn create_bundle(envelope_input_size: usize, envelopes_count: u32, private_key: Option<String>) -> Result<()> {
     let provider = create_evm_http_client("https://testnet-rpc.wvm.dev").await?;
     let provider = std::sync::Arc::new(provider);
 
@@ -152,7 +124,7 @@ pub async fn create_parallel_bundle(envelope_input_size: usize, envelopes_count:
         serde_json::to_vec(&bundle).unwrap().len());
     println!("FINAL ENVELOPES BUNDLE SIZE (BYTES): {:?}", compressed.len());
 
-    broadcast_bundle(compressed, &provider).await?;
+    broadcast_bundle(compressed, &provider, private_key).await?;
 
     Ok(())
 }
