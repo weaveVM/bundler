@@ -6,6 +6,6 @@ pub fn get_env_key(key: String) -> Result<String, env::VarError> {
 
     match env::var(key) {
         Ok(val) => Ok(val),
-        Err(e) => Err(e) 
+        Err(e) => Err(e),
     }
 }

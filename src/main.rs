@@ -1,9 +1,15 @@
 pub mod utils;
-use crate::utils::evm::{create_bundle};
+use crate::utils::types::Bundle;
+use serde_json;
 
 #[tokio::main]
 async fn main() {
+    let private_key = String::from("");
 
     println!("Hello, world!");
-    create_bundle(0, 5_000_000, Option::None).await.unwrap() // 840_000
+    let envelope_0: Vec<u8> = serde_json::to_vec("hello world from weaveVM bundler").unwrap();
+    let envelope_1: Vec<u8> = vec![1, 2, 3];
+    let _bundle = Bundle::propagate_bundle(vec![envelope_0, envelope_1], Some(private_key))
+        .await
+        .unwrap();
 }

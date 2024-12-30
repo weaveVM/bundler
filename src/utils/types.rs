@@ -1,23 +1,49 @@
-use alloy::{consensus::{Transaction, TxEnvelope}, primitives::Bytes};
+use alloy::{
+    consensus::{Transaction, TxEnvelope},
+    primitives::Bytes,
+};
 use serde;
 
 use borsh::{from_slice, to_vec};
 use borsh_derive::{BorshDeserialize, BorshSerialize};
 
 use std::{
-    convert::TryFrom, env, fs::File, io::{Read, Write}
+    convert::TryFrom,
+    env,
+    fs::File,
+    io::{Read, Write},
 };
 
-// #[derive(Debug, serde::Serialize, serde::Deserialize, BorshSerialize, BorshDeserialize, PartialEq)]
-// pub struct TxEnvelopeWrapper(pub TxEnvelope);
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize, PartialEq, BorshSerialize, BorshDeserialize)]
+use eyre::Result;
+
+use crate::utils::evm::{create_bundle, create_envelope};
+
+#[derive(
+    Clone,
+    Debug,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    BorshSerialize,
+    BorshDeserialize,
+)]
 pub struct EnvelopeSignature {
     pub y_parity: bool,
     pub r: String,
-    pub s: String
+    pub s: String,
 }
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize, PartialEq, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Clone,
+    Debug,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    BorshSerialize,
+    BorshDeserialize,
+)]
 pub struct TxEnvelopeWrapper {
     pub chain_id: u64,
     pub nonce: u64,
@@ -27,28 +53,46 @@ pub struct TxEnvelopeWrapper {
     pub value: String,
     pub input: String,
     pub hash: String,
-    pub signature: EnvelopeSignature
+    pub signature: EnvelopeSignature,
 }
-#[derive(Debug, Default, serde::Serialize, serde::Deserialize, PartialEq, BorshSerialize, BorshDeserialize)]
+#[derive(
+    Debug,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+    PartialEq,
+    BorshSerialize,
+    BorshDeserialize,
+)]
 pub struct Bundle {
-    envelopes: Vec<TxEnvelopeWrapper>
+    pub envelopes: Vec<TxEnvelopeWrapper>,
 }
 
 impl Bundle {
     pub fn from(envelopes: Vec<TxEnvelopeWrapper>) -> Self {
         Bundle { envelopes }
     }
+
+    pub async fn create_envelope(private_key: Option<&str>, input: Vec<u8>) -> Result<TxEnvelope> {
+        create_envelope(private_key, input).await
+    }
+
+    pub async fn propagate_bundle(
+        envelope_inputs: Vec<Vec<u8>>,
+        private_key: Option<String>,
+    ) -> Result<()> {
+        create_bundle(envelope_inputs, private_key).await
+    }
 }
 
 impl TxEnvelopeWrapper {
     pub fn from_envelope(envelope: TxEnvelope) -> Self {
-
         let sig: alloy::signers::Signature = envelope.signature().clone();
 
         let env_sig = EnvelopeSignature {
             y_parity: sig.v(),
             r: sig.r().to_string(),
-            s: sig.s().to_string()  
+            s: sig.s().to_string(),
         };
 
         TxEnvelopeWrapper {
@@ -60,15 +104,14 @@ impl TxEnvelopeWrapper {
             value: envelope.value().to_string(),
             input: envelope.input().to_string(),
             hash: envelope.tx_hash().to_string(),
-            signature: env_sig
+            signature: env_sig,
         }
     }
 
-
-    pub fn brotli_compress_stream<R: Read>(reader: &mut R) -> Vec<u8>{
+    pub fn brotli_compress_stream<R: Read>(reader: &mut R) -> Vec<u8> {
         let mut writer = brotli::CompressorWriter::new(Vec::new(), 65_536, 8, 22); // 65536 -- 64 KiB
         let mut buffer = [0u8; 65_536];
-    
+
         loop {
             let bytes_read = reader.read(&mut buffer).unwrap();
             if bytes_read == 0 {
@@ -76,7 +119,7 @@ impl TxEnvelopeWrapper {
             }
             writer.write_all(&buffer[..bytes_read]).unwrap();
         }
-    
+
         writer.into_inner()
     }
 
@@ -103,6 +146,3 @@ impl TxEnvelopeWrapper {
         res
     }
 }
-
-
-
