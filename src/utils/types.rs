@@ -14,7 +14,7 @@ use std::{
     io::{Read, Write},
 };
 
-use eyre::Result;
+// use eyre::{Ok, Result};
 
 use crate::utils::evm::{create_bundle, create_envelope};
 
@@ -64,25 +64,73 @@ pub struct TxEnvelopeWrapper {
     BorshSerialize,
     BorshDeserialize,
 )]
-pub struct Bundle {
+pub struct BundleData {
     pub envelopes: Vec<TxEnvelopeWrapper>,
 }
 
+#[derive(Debug, Default)]
+pub struct Bundle {
+    pub envelopes: Option<Vec<Vec<u8>>>,
+    pub private_key: Option<String>,
+}
+
 impl Bundle {
-    pub fn from(envelopes: Vec<TxEnvelopeWrapper>) -> Self {
-        Bundle { envelopes }
+    pub fn new() -> Self {
+        Bundle {
+            envelopes: None,
+            private_key: None,
+        }
     }
 
-    pub async fn create_envelope(private_key: Option<&str>, input: Vec<u8>) -> Result<TxEnvelope> {
+    pub fn private_key(mut self, key: String) -> Self {
+        self.private_key = Some(key);
+        self
+    }
+
+    pub fn envelopes(mut self, envelopes: Vec<Vec<u8>>) -> Self {
+        self.envelopes = Some(envelopes);
+        self
+    }
+
+    pub fn add_envelope(mut self, envelope: Vec<u8>) -> Self {
+        self.envelopes.get_or_insert(Vec::new()).push(envelope);
+        self
+    }
+
+    pub fn build(self) -> Self {
+        assert_ne!(self.envelopes.clone().unwrap().len(), 0);
+        assert_ne!(self.private_key.clone().unwrap().len(), 0);
+
+        Bundle {
+            envelopes: self.envelopes,
+            private_key: self.private_key,
+        }
+    }
+    pub async fn propagate(self) -> eyre::Result<String> {
+        let tx = create_bundle(self.envelopes.unwrap(), self.private_key.unwrap()).await?;
+        let hash = tx.tx_hash().to_string();
+        Ok(hash)
+    }
+}
+
+impl BundleData {
+    pub fn from(envelopes: Vec<TxEnvelopeWrapper>) -> Self {
+        BundleData { envelopes }
+    }
+
+    pub async fn create_envelope(
+        private_key: Option<&str>,
+        input: Vec<u8>,
+    ) -> eyre::Result<TxEnvelope> {
         create_envelope(private_key, input).await
     }
 
-    pub async fn propagate_bundle(
-        envelope_inputs: Vec<Vec<u8>>,
-        private_key: Option<String>,
-    ) -> Result<()> {
-        create_bundle(envelope_inputs, private_key).await
-    }
+    // pub async fn propagate_bundle(
+    //     envelope_inputs: Vec<Vec<u8>>,
+    //     private_key: Option<String>,
+    // ) -> Result<()> {
+    //     create_bundle(envelope_inputs, private_key.unwrap()).await
+    // }
 }
 
 impl TxEnvelopeWrapper {
@@ -138,11 +186,11 @@ impl TxEnvelopeWrapper {
             .expect("Decompression failed");
         decompressed_data
     }
-    pub fn borsh_ser(input: &Bundle) -> Vec<u8> {
+    pub fn borsh_ser(input: &BundleData) -> Vec<u8> {
         to_vec(input).unwrap()
     }
-    pub fn borsh_der(input: Vec<u8>) -> Bundle {
-        let res: Bundle = from_slice(&input).expect("error deseriliazing the calldata");
+    pub fn borsh_der(input: Vec<u8>) -> BundleData {
+        let res: BundleData = from_slice(&input).expect("error deseriliazing the calldata");
         res
     }
 }

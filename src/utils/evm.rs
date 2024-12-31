@@ -11,7 +11,7 @@ use alloy::{
     signers::local::PrivateKeySigner,
 };
 use eyre::Result;
-use rand::{thread_rng, RngCore};
+use rand::{thread_rng, Rng, RngCore};
 
 use crate::utils::constants::{CHAIN_ID, WVM_RPC_URL, ZERO_ADDRESS};
 
@@ -20,7 +20,7 @@ use tokio::task;
 
 use crate::utils::env_var::get_env_key;
 
-use crate::utils::types::{Bundle, TxEnvelopeWrapper};
+use crate::utils::types::{BundleData, TxEnvelopeWrapper};
 use serde_json;
 use std::io::Cursor;
 
@@ -51,7 +51,7 @@ async fn broadcast_bundle(
     envelopes: Vec<u8>,
     provider: &RootProvider<Http<Client>>,
     private_key: Option<String>,
-) -> Result<()> {
+) -> Result<(alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum>)> {
     let signer: PrivateKeySigner = private_key.unwrap().parse()?;
     let wallet = EthereumWallet::from(signer.clone());
     let nonce = provider
@@ -68,18 +68,19 @@ async fn broadcast_bundle(
         .with_max_priority_fee_per_gas(1_000_000_000)
         .with_max_fee_per_gas(2_000_000_000);
     let tx_envelope: alloy::consensus::TxEnvelope = tx.build(&wallet).await?;
-    let tx = provider.send_tx_envelope(tx_envelope).await?;
+    let tx: alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum> =
+        provider.send_tx_envelope(tx_envelope).await?;
     println!("{:?}", tx);
-    Ok(())
+    Ok(tx)
 }
 
 pub async fn create_bundle(
     envelope_inputs: Vec<Vec<u8>>,
-    private_key: Option<String>,
-) -> Result<()> {
+    private_key: String,
+) -> Result<alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum>> {
     let provider = create_evm_http_client(WVM_RPC_URL).await?;
     let provider = std::sync::Arc::new(provider);
-    let private_key = private_key.clone().unwrap();
+    let private_key = private_key.clone();
 
     // Create vector of futures
     let futures: Vec<_> = envelope_inputs
@@ -109,7 +110,7 @@ pub async fn create_bundle(
 
     println!("finished creating txs");
 
-    let bundle = Bundle::from(envelopes.clone());
+    let bundle = BundleData::from(envelopes.clone());
     println!("created bundle");
 
     let serialized = TxEnvelopeWrapper::borsh_ser(&bundle);
@@ -132,7 +133,28 @@ pub async fn create_bundle(
         compressed.len()
     );
 
-    broadcast_bundle(compressed, &provider, Some(private_key)).await?;
+    let tx: alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum> =
+        broadcast_bundle(compressed, &provider, Some(private_key)).await?;
 
-    Ok(())
+    Ok(tx)
+}
+
+pub fn generate_random_calldata(length: usize) -> String {
+    let mut rng = rand::thread_rng();
+
+    // Ensure minimum length of 10 (0x + 4 bytes function selector)
+    let min_length = 10;
+    let actual_length = length.max(min_length);
+
+    // Start with 0x prefix
+    let mut calldata = String::with_capacity(actual_length);
+    calldata.push_str("0x");
+
+    // Generate random hex characters for the remaining length
+    for _ in 2..actual_length {
+        let random_hex = rng.gen_range(0..16);
+        calldata.push_str(&format!("{:x}", random_hex));
+    }
+
+    calldata
 }
