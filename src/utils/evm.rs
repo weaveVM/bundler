@@ -2,27 +2,27 @@ use alloy::{
     consensus::TxEnvelope,
     primitives::Address,
     providers::{Provider, ProviderBuilder, RootProvider},
+    rpc::types::Bundle,
     transports::http::{Client, Http},
 };
 use alloy::{
     network::{EthereumWallet, TransactionBuilder},
-    primitives::U256,
+    primitives::{B256, U256},
     rpc::types::TransactionRequest,
     signers::local::PrivateKeySigner,
 };
 use eyre::Result;
-use rand::{thread_rng, Rng, RngCore};
+use hex;
+use rand::Rng;
 
-use crate::utils::constants::{CHAIN_ID, WVM_RPC_URL, ZERO_ADDRESS};
+use crate::utils::constants::{CHAIN_ID, WVM_RPC_URL};
 
 use futures::future::join_all;
 use tokio::task;
 
-use crate::utils::env_var::get_env_key;
-
-use crate::utils::types::{BundleData, TxEnvelopeWrapper};
+use crate::utils::types::{BundleData, GetBlockFromTx, TxEnvelopeWrapper};
 use serde_json;
-use std::io::Cursor;
+use std::{io::Cursor, str::FromStr};
 
 async fn create_evm_http_client(rpc_url: &str) -> Result<RootProvider<Http<Client>>> {
     let rpc_url = rpc_url.parse()?;
@@ -35,7 +35,7 @@ pub async fn create_envelope(private_key: Option<&str>, input: Vec<u8>) -> Resul
     let wallet = EthereumWallet::from(signer.clone());
 
     let tx = TransactionRequest::default()
-        .with_to(ZERO_ADDRESS.parse::<Address>()?)
+        .with_to(Address::ZERO)
         .with_nonce(0)
         .with_chain_id(CHAIN_ID)
         .with_input(input)
@@ -51,7 +51,7 @@ async fn broadcast_bundle(
     envelopes: Vec<u8>,
     provider: &RootProvider<Http<Client>>,
     private_key: Option<String>,
-) -> Result<(alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum>)> {
+) -> Result<alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum>> {
     let signer: PrivateKeySigner = private_key.unwrap().parse()?;
     let wallet = EthereumWallet::from(signer.clone());
     let nonce = provider
@@ -59,7 +59,7 @@ async fn broadcast_bundle(
         .await?;
 
     let tx = TransactionRequest::default()
-        .with_to(ZERO_ADDRESS.parse::<Address>()?)
+        .with_to(Address::ZERO)
         .with_nonce(nonce)
         .with_chain_id(CHAIN_ID)
         .with_input(envelopes)
@@ -117,7 +117,7 @@ pub async fn create_bundle(
     println!("borsh serialized");
 
     let mut input = Cursor::new(&serialized);
-    let compressed = TxEnvelopeWrapper::brotli_compress_stream(&mut input);
+    let compressed = TxEnvelopeWrapper::brotli_compress(&serialized);
     println!("brotli compressed");
 
     println!(
@@ -157,4 +157,33 @@ pub fn generate_random_calldata(length: usize) -> String {
     }
 
     calldata
+}
+
+pub async fn retrieve_bundle_tx(txid: String) -> Result<GetBlockFromTx> {
+    let provider = create_evm_http_client(WVM_RPC_URL).await?;
+    let txid = B256::from_str(&txid)?;
+    let tx = provider.get_transaction_by_hash(txid).await?;
+    let tx_json = serde_json::json!(&tx.unwrap());
+
+    let block_hash: &str = tx_json["blockHash"].as_str().unwrap_or("0x");
+    let block_number_hex: &str = tx_json["blockNumber"].as_str().unwrap_or("0x");
+    let block_number_dec = U256::from_str(block_number_hex).unwrap_or(U256::ZERO);
+    let calldata: &str = tx_json["input"].as_str().unwrap_or("0x");
+
+    let res = GetBlockFromTx::from(
+        block_number_dec.to_string(),
+        block_hash.to_string(),
+        calldata.to_string(),
+    );
+    Ok(res)
+}
+
+pub async fn retrieve_bundle_data(calldata: String) -> BundleData {
+    let byte_array = hex::decode(calldata.trim_start_matches("0x")).expect("decoding failed");
+    println!("{:?}", byte_array);
+    let mut input = Cursor::new(&byte_array);
+    let unbrotli = TxEnvelopeWrapper::brotli_decompress(byte_array);
+    println!("{:?}", unbrotli);
+    let unborsh: BundleData = TxEnvelopeWrapper::borsh_der(unbrotli);
+    unborsh
 }

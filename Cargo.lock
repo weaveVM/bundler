@@ -1032,6 +1032,7 @@ dependencies = [
  "dotenv",
  "eyre",
  "futures",
+ "hex",
  "rand",
  "serde",
  "serde_json",

@@ -2,7 +2,7 @@ use alloy::{
     consensus::{Transaction, TxEnvelope},
     primitives::Bytes,
 };
-use serde;
+use serde::{self, Deserialize, Serialize};
 
 use borsh::{from_slice, to_vec};
 use borsh_derive::{BorshDeserialize, BorshSerialize};
@@ -16,7 +16,7 @@ use std::{
 
 // use eyre::{Ok, Result};
 
-use crate::utils::evm::{create_bundle, create_envelope};
+use crate::utils::evm::{create_bundle, create_envelope, retrieve_bundle_data, retrieve_bundle_tx};
 
 #[derive(
     Clone,
@@ -111,6 +111,12 @@ impl Bundle {
         let hash = tx.tx_hash().to_string();
         Ok(hash)
     }
+
+    pub async fn retrieve_envelopes(bundle_txid: String) -> eyre::Result<BundleData> {
+        let bundle = retrieve_bundle_tx(bundle_txid).await?;
+        let res = retrieve_bundle_data(bundle.calldata).await;
+        Ok(res)
+    }
 }
 
 impl BundleData {
@@ -171,6 +177,13 @@ impl TxEnvelopeWrapper {
         writer.into_inner()
     }
 
+    pub fn brotli_decompress_stream<R: Read>(reader: &mut R) -> Vec<u8> {
+        let mut writer = Vec::new();
+        let mut decoder = brotli::Decompressor::new(reader, 65_536);
+        std::io::copy(&mut decoder, &mut writer).unwrap();
+        writer
+    }
+
     pub fn brotli_compress(input: &[u8]) -> Vec<u8> {
         let mut writer = brotli::CompressorWriter::new(Vec::new(), 65536, 9, 22);
         writer.write_all(input).unwrap();
@@ -192,5 +205,22 @@ impl TxEnvelopeWrapper {
     pub fn borsh_der(input: Vec<u8>) -> BundleData {
         let res: BundleData = from_slice(&input).expect("error deseriliazing the calldata");
         res
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetBlockFromTx {
+    pub number: String,
+    pub hash: String,
+    pub calldata: String,
+}
+
+impl GetBlockFromTx {
+    pub fn from(number: String, hash: String, calldata: String) -> Self {
+        GetBlockFromTx {
+            number,
+            hash,
+            calldata,
+        }
     }
 }
