@@ -2,7 +2,6 @@ use alloy::{
     consensus::TxEnvelope,
     primitives::Address,
     providers::{Provider, ProviderBuilder, RootProvider},
-    rpc::types::Bundle,
     transports::http::{Client, Http},
 };
 use alloy::{
@@ -22,7 +21,7 @@ use tokio::task;
 
 use crate::utils::types::{BundleData, GetBlockFromTx, TxEnvelopeWrapper};
 use serde_json;
-use std::{io::Cursor, str::FromStr};
+use std::str::FromStr;
 
 async fn create_evm_http_client(rpc_url: &str) -> Result<RootProvider<Http<Client>>> {
     let rpc_url = rpc_url.parse()?;
@@ -116,7 +115,6 @@ pub async fn create_bundle(
     let serialized = TxEnvelopeWrapper::borsh_ser(&bundle);
     println!("borsh serialized");
 
-    let mut input = Cursor::new(&serialized);
     let compressed = TxEnvelopeWrapper::brotli_compress(&serialized);
     println!("brotli compressed");
 
@@ -180,10 +178,7 @@ pub async fn retrieve_bundle_tx(txid: String) -> Result<GetBlockFromTx> {
 
 pub async fn retrieve_bundle_data(calldata: String) -> BundleData {
     let byte_array = hex::decode(calldata.trim_start_matches("0x")).expect("decoding failed");
-    println!("{:?}", byte_array);
-    let mut input = Cursor::new(&byte_array);
     let unbrotli = TxEnvelopeWrapper::brotli_decompress(byte_array);
-    println!("{:?}", unbrotli);
     let unborsh: BundleData = TxEnvelopeWrapper::borsh_der(unbrotli);
     unborsh
 }

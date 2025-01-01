@@ -3,6 +3,14 @@ name = "bundler"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "bundler"
+path = "src/lib.rs"
+
+[[bin]]
+name = "bundler"
+path = "src/main.rs"
+
 [dependencies]
 alloy = {version = "0.8.3", features = ["full"]}
 borsh = "1.5.3"

@@ -130,13 +130,6 @@ impl BundleData {
     ) -> eyre::Result<TxEnvelope> {
         create_envelope(private_key, input).await
     }
-
-    // pub async fn propagate_bundle(
-    //     envelope_inputs: Vec<Vec<u8>>,
-    //     private_key: Option<String>,
-    // ) -> Result<()> {
-    //     create_bundle(envelope_inputs, private_key.unwrap()).await
-    // }
 }
 
 impl TxEnvelopeWrapper {
