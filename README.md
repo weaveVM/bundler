@@ -1,21 +1,202 @@
-MIT License
+<p align="center">
+  <a href="https://wvm.dev">
+    <img src="https://raw.githubusercontent.com/weaveVM/.github/main/profile/bg.png">
+  </a>
+</p>
 
-Copyright (c) 2025 WVM
+## About
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+WeaveVM Bundler is a data protocol specification and library that introduces the first bundled EVM transactions format. This protocol draws inspiration from Arweave's [ANS-102](https://github.com/ArweaveTeam/arweave-standards/blob/master/ans/ANS-102.md) specification.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+### Advantages of WeaveVM bundled transactions
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+* Reduces transaction overhead fees from multiple fees (`n`) per `n` transaction to a single fee per bundle of envelopes (`n` transactions)
+* Enables third-party services to handle bundle settlement on WeaveVM
+* Maximizes the TPS capacity of WeaveVM network without requiring additional protocol changes or constraints
+* Supports relational data grouping by combining multiple related transactions into a single bundle
+
+## Protocol Specification
+
+### Nomenclature
+- Envelope: A legacy EVM transaction that serves as the fundamental building block and composition unit of a Bundle
+- Bundle: An EIP-1559 transaction that groups multiple envelopes (`n > 0`), enabling efficient transaction batching and processing
+
+### Bundle Format
+
+A bundle is a group of envelopes organized through the following process:
+
+1. Envelopes MUST be grouped in a vector
+2. The bundle is Borsh serialized according to the `BundleData` type
+3. The resulting serialization vector is compressed using Brotli compression
+4. The Borsh-Brotli serialized-compressed vector is added as `input` (calldata) to an EIP-1559 transaction
+5. The resulting bundle is broadcasted on WeaveVM with `target` set to `0x0000000000000000000000000000000000000000`
+
+```rust
+pub struct BundleData {
+    pub envelopes: Vec<TxEnvelopeWrapper>,
+}
+``` 
+
+```mermaid
+flowchart TB
+    env[Envelopes] --> vec[Vector of TxEnvelopeWrapper]
+    vec --> bs[Borsh Serialization]
+    subgraph Serialization
+        bs --> bv[Serialized Vector]
+        bv --> bc[Brotli Compression]
+    end
+    bc --> comp[Compressed Data]
+    comp --> eip[EIP-1559 Transaction]
+    eip --> |input/calldata| bundle[Bundle]
+    bundle --> |broadcast| wvm[WeaveVM Network]
+
+    style vec fill:#2d3748,stroke:#1a202c,color:#fff
+    style bs fill:#1a365d,stroke:#2a4365,color:#fff
+    style bc fill:#1a365d,stroke:#2a4365,color:#fff
+    style bundle fill:#22543d,stroke:#276749,color:#fff
+    style wvm fill:#3c366b,stroke:#4c51bf,color:#fff
+    style env fill:#2d3748,stroke:#1a202c,color:#fff
+    style comp fill:#2d3748,stroke:#1a202c,color:#fff
+    style eip fill:#2d3748,stroke:#1a202c,color:#fff
+    style Serialization fill:#1a202c,stroke:#2d3748,color:#fff
+```
+
+### Envelope Format
+
+An envelope is a signed Legacy EVM transaction with the following MUSTs and restrictions.
+
+```rs
+pub struct EnvelopeSignature {
+    pub y_parity: bool,
+    pub r: String,
+    pub s: String,
+}
+
+pub struct TxEnvelopeWrapper {
+    pub chain_id: u64,
+    pub nonce: u64,
+    pub gas_price: u128,
+    pub gas_limit: u64,
+    pub to: String,
+    pub value: String,
+    pub input: String,
+    pub hash: String,
+    pub signature: EnvelopeSignature,
+}
+```
+
+1. **Transaction Fields**
+   * `nonce`: MUST be 0
+   * `gas_limit`: MUST be 0
+   * `gas_price`: MUST be 0
+   * `value`: MUST be 0
+
+2. **Size Restrictions**
+   * Total Borsh-Brotli compressed envelopes (Bundle data) MUST be under 9 MB
+
+3. **Signature Requirements**
+   * each envelope MUST have a valid signature
+
+4. **Usage Constraints**
+   * MUST be used strictly for data settling on WeaveVM 
+   * MUST only contain envelope's calldata, with optional `target` setting (default fallback to ZERO address)
+   * CANNOT be used for:
+     - tWVM transfers
+     - Contract interactions
+     - Any purpose other than data settling
+
+
+### Transaction Type Choice
+The selection of transaction types follows clear efficiency principles. Legacy transactions were chosen for envelopes due to their minimal size (144 bytes), making them the most space-efficient option for data storage. EIP-1559 transactions were adopted for bundles as the widely accepted standard for transaction processing.
+
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+graph LR
+    subgraph Transaction Size in Bytes
+    L["Legacy (144)"]
+    E1["Eip2930 (160)"]
+    E2["Eip1559 (176)"]
+    E3["Eip4844 (208)"]
+    E4["Eip7702 (192)"]
+    D["Deposit (192)"]
+    end
+
+    style L fill:#1a365d,stroke:#2a4365,color:#fff,stroke-width:4px
+    style E1 fill:#1a365d,stroke:#2a4365,color:#fff,stroke-width:4.4px
+    style E2 fill:#1a365d,stroke:#2a4365,color:#fff,stroke-width:4.8px
+    style E3 fill:#1a365d,stroke:#2a4365,color:#fff,stroke-width:5.7px
+    style E4 fill:#1a365d,stroke:#2a4365,color:#fff,stroke-width:5.3px
+    style D fill:#1a365d,stroke:#2a4365,color:#fff,stroke-width:5.3px
+```
+
+### Notes
+* Envelopes exist as signed Legacy transactions within bundles but operate under distinct processing rules - they are not individually processed by the WeaveVM network as transactions, despite having the structure of a Legacy transaction (signed data with a Transaction type). Instead, they are bundled together and processed as a single onchain transaction (therefore the advantage of Bundler).
+
+* Multiple instances of the same envelope within a bundle are permissible and do not invalidate either the bundle or the envelopes themselves. These duplicate instances are treated as copies sharing the same timestamp when found in a single bundle. When appearing across different bundles, they are considered distinct instances with their respective bundle timestamps (valid envelopes and considered as copies of distinct timestamps).
+
+* Since envelopes are implemented as signed Legacy transactions, they are strictly reserved for data settling purposes. Their use for any other purpose is explicitly prohibited for the envelope's signer security.
+
+## Bundler Library
+
+### Import Bundler in your project
+
+```toml
+bundler = { git = "https://github.com/weaveVM/bundler", branch = "main" }
+```
+
+### Build an envelope, build a bundle
+
+```rust
+use bundler::utils::types::{Bundler, Envelope};
+
+// Envelope
+let envelope = Envelope::new()
+    .data(byte_vec)
+    .target(address)
+    .build()?;
+
+// Bundle
+let bundle_tx = Bundle::new()
+    .private_key(private_key)
+    .envelopes(envelopes)
+    .build()
+    .propagate()
+    .await?;
+```
+
+### Example: Build a bundle packed with envelopes
+
+```rust
+async fn send_bundle_without_target() -> eyre::Result<String> {
+    // will fail until a tWVM funded EOA (pk) is provided
+    let private_key = String::from("");
+    
+    let mut envelopes: Vec<Envelope> = vec![];
+    
+    for _ in 0..10 {
+        let random_calldata: String = generate_random_calldata(128_000); // 128 KB of random calldata
+        let envelope_data = serde_json::to_vec(&random_calldata).unwrap();
+        
+        let envelope = Envelope::new()
+            .data(Some(envelope_data))
+            .target(None)
+            .build()?;
+            
+        envelopes.push(envelope);
+    }
+    
+    let bundle_tx = Bundle::new()
+        .private_key(private_key)
+        .envelopes(envelopes)
+        .build()
+        .propagate()
+        .await?;
+        
+    Ok(bundle_tx)
+}
+```
+
+For more examples, check the tests in [lib.rs](./src/lib.rs) and have a look over [types](./src/utils/types.rs)
+
+## License
+This project is licensed under the [MIT License](./LICENSE)

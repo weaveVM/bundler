@@ -37,13 +37,12 @@ mod tests {
             envelopes.push(envelope);
         }
 
-        let bundle = Bundle::new()
+        let bundle_tx = Bundle::new()
             .private_key(private_key)
             .envelopes(envelopes)
             .build()
             .propagate()
-            .await;
-        let bundle_tx = bundle.unwrap();
+            .await?;
         assert_eq!(bundle_tx.len(), 66);
         Ok(())
     }
@@ -66,13 +65,12 @@ mod tests {
             envelopes.push(envelope);
         }
 
-        let bundle = Bundle::new()
+        let bundle_tx = Bundle::new()
             .private_key(private_key)
             .envelopes(envelopes)
             .build()
             .propagate()
-            .await;
-        let bundle_tx = bundle.unwrap();
+            .await?;
         assert_eq!(bundle_tx.len(), 66);
         Ok(())
     }
