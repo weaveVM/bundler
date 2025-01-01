@@ -30,16 +30,20 @@ async fn create_evm_http_client(rpc_url: &str) -> Result<RootProvider<Http<Clien
 pub async fn create_envelope(private_key: Option<&str>, envelope: Envelope) -> Result<TxEnvelope> {
     let signer: PrivateKeySigner = private_key.unwrap().parse()?;
     let wallet = EthereumWallet::from(signer.clone());
-    let target_address = envelope
+    let envelope_target_address = envelope
         .target
         .map(|t| t.parse::<Address>().unwrap_or(Address::ZERO))
         .unwrap_or(Address::ZERO);
 
+    let envelope_data = envelope
+        .data
+        .ok_or_else(|| eyre::eyre!("Error data required"))?;
+
     let tx = TransactionRequest::default()
-        .with_to(target_address)
+        .with_to(envelope_target_address)
         .with_nonce(0)
         .with_chain_id(CHAIN_ID)
-        .with_input(envelope.data)
+        .with_input(envelope_data)
         .with_value(U256::from(0))
         .with_gas_limit(0)
         .with_gas_price(0);
