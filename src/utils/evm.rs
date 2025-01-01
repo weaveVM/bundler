@@ -1,27 +1,25 @@
-use alloy::{
-    consensus::TxEnvelope,
-    primitives::Address,
-    providers::{Provider, ProviderBuilder, RootProvider},
-    transports::http::{Client, Http},
+use {
+    crate::utils::{
+        constants::{CHAIN_ID, WVM_RPC_URL},
+        types::{BundleData, GetBlockFromTx, TxEnvelopeWrapper},
+    },
+    alloy::{
+        consensus::TxEnvelope,
+        network::{EthereumWallet, TransactionBuilder},
+        primitives::{Address, B256, U256},
+        providers::{Provider, ProviderBuilder, RootProvider},
+        rpc::types::TransactionRequest,
+        signers::local::PrivateKeySigner,
+        transports::http::{Client, Http},
+    },
+    eyre::Result,
+    futures::future::join_all,
+    hex,
+    rand::Rng,
+    serde_json,
+    std::str::FromStr,
+    tokio::task,
 };
-use alloy::{
-    network::{EthereumWallet, TransactionBuilder},
-    primitives::{B256, U256},
-    rpc::types::TransactionRequest,
-    signers::local::PrivateKeySigner,
-};
-use eyre::Result;
-use hex;
-use rand::Rng;
-
-use crate::utils::constants::{CHAIN_ID, WVM_RPC_URL};
-
-use futures::future::join_all;
-use tokio::task;
-
-use crate::utils::types::{BundleData, GetBlockFromTx, TxEnvelopeWrapper};
-use serde_json;
-use std::str::FromStr;
 
 async fn create_evm_http_client(rpc_url: &str) -> Result<RootProvider<Http<Client>>> {
     let rpc_url = rpc_url.parse()?;
@@ -107,29 +105,9 @@ pub async fn create_bundle(
         .filter_map(|r| r.ok())
         .collect();
 
-    println!("finished creating txs");
-
     let bundle = BundleData::from(envelopes.clone());
-    println!("created bundle");
-
     let serialized = TxEnvelopeWrapper::borsh_ser(&bundle);
-    println!("borsh serialized");
-
     let compressed = TxEnvelopeWrapper::brotli_compress(&serialized);
-    println!("brotli compressed");
-
-    println!(
-        "\nENVELOPES COUNT IN THE BUNDLED TX -- COUNT: {:?}",
-        envelopes.len()
-    );
-    println!(
-        "ORIGINAL ENVELOPES BUNDLE SIZE (BYTES): {:?}",
-        serde_json::to_vec(&bundle).unwrap().len()
-    );
-    println!(
-        "FINAL ENVELOPES BUNDLE SIZE (BYTES): {:?}",
-        compressed.len()
-    );
 
     let tx: alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum> =
         broadcast_bundle(compressed, &provider, Some(private_key)).await?;

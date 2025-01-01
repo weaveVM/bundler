@@ -1,5 +1,4 @@
-use dotenv::dotenv;
-use std::env;
+use {dotenv::dotenv, std::env};
 
 pub fn get_env_key(key: String) -> Result<String, env::VarError> {
     dotenv().ok();

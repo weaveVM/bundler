@@ -1,22 +1,11 @@
-use alloy::{
-    consensus::{Transaction, TxEnvelope},
-    primitives::Bytes,
+use {
+    crate::utils::evm::{create_bundle, create_envelope, retrieve_bundle_data, retrieve_bundle_tx},
+    alloy::consensus::{Transaction, TxEnvelope},
+    borsh::{from_slice, to_vec},
+    borsh_derive::{BorshDeserialize, BorshSerialize},
+    serde::{self, Deserialize, Serialize},
+    std::io::{Read, Write},
 };
-use serde::{self, Deserialize, Serialize};
-
-use borsh::{from_slice, to_vec};
-use borsh_derive::{BorshDeserialize, BorshSerialize};
-
-use std::{
-    convert::TryFrom,
-    env,
-    fs::File,
-    io::{Read, Write},
-};
-
-// use eyre::{Ok, Result};
-
-use crate::utils::evm::{create_bundle, create_envelope, retrieve_bundle_data, retrieve_bundle_tx};
 
 #[derive(
     Clone,
