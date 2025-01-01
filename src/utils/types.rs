@@ -59,7 +59,7 @@ pub struct BundleData {
 
 #[derive(Debug, Default)]
 pub struct Bundle {
-    pub envelopes: Option<Vec<Vec<u8>>>,
+    pub envelopes: Option<Vec<Envelope>>,
     pub private_key: Option<String>,
 }
 
@@ -76,12 +76,12 @@ impl Bundle {
         self
     }
 
-    pub fn envelopes(mut self, envelopes: Vec<Vec<u8>>) -> Self {
+    pub fn envelopes(mut self, envelopes: Vec<Envelope>) -> Self {
         self.envelopes = Some(envelopes);
         self
     }
 
-    pub fn add_envelope(mut self, envelope: Vec<u8>) -> Self {
+    pub fn add_envelope(mut self, envelope: Envelope) -> Self {
         self.envelopes.get_or_insert(Vec::new()).push(envelope);
         self
     }
@@ -115,9 +115,9 @@ impl BundleData {
 
     pub async fn create_envelope(
         private_key: Option<&str>,
-        input: Vec<u8>,
+        envelope: Envelope,
     ) -> eyre::Result<TxEnvelope> {
-        create_envelope(private_key, input).await
+        create_envelope(private_key, envelope).await
     }
 }
 
@@ -204,5 +204,17 @@ impl GetBlockFromTx {
             hash,
             calldata,
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Envelope {
+    pub data: Vec<u8>,
+    pub target: Option<String>,
+}
+
+impl Envelope {
+    pub fn from(data: Vec<u8>, target: Option<String>) -> Self {
+        Self { data, target }
     }
 }

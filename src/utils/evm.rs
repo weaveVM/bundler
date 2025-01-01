@@ -1,7 +1,7 @@
 use {
     crate::utils::{
         constants::{CHAIN_ID, WVM_RPC_URL},
-        types::{BundleData, GetBlockFromTx, TxEnvelopeWrapper},
+        types::{BundleData, Envelope, GetBlockFromTx, TxEnvelopeWrapper},
     },
     alloy::{
         consensus::TxEnvelope,
@@ -27,15 +27,19 @@ async fn create_evm_http_client(rpc_url: &str) -> Result<RootProvider<Http<Clien
     Ok(provider)
 }
 
-pub async fn create_envelope(private_key: Option<&str>, input: Vec<u8>) -> Result<TxEnvelope> {
+pub async fn create_envelope(private_key: Option<&str>, envelope: Envelope) -> Result<TxEnvelope> {
     let signer: PrivateKeySigner = private_key.unwrap().parse()?;
     let wallet = EthereumWallet::from(signer.clone());
+    let target_address = envelope
+        .target
+        .map(|t| t.parse::<Address>().unwrap_or(Address::ZERO))
+        .unwrap_or(Address::ZERO);
 
     let tx = TransactionRequest::default()
-        .with_to(Address::ZERO)
+        .with_to(target_address)
         .with_nonce(0)
         .with_chain_id(CHAIN_ID)
-        .with_input(input)
+        .with_input(envelope.data)
         .with_value(U256::from(0))
         .with_gas_limit(0)
         .with_gas_price(0);
@@ -72,7 +76,7 @@ async fn broadcast_bundle(
 }
 
 pub async fn create_bundle(
-    envelope_inputs: Vec<Vec<u8>>,
+    envelope_inputs: Vec<Envelope>,
     private_key: String,
 ) -> Result<alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum>> {
     let provider = create_evm_http_client(WVM_RPC_URL).await?;
