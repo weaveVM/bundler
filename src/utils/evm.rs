@@ -1,6 +1,6 @@
 use {
     crate::utils::{
-        constants::{CHAIN_ID, WVM_RPC_URL},
+        constants::{ADDRESS_BABE1, CHAIN_ID, WVM_RPC_URL},
         types::{BundleData, Envelope, GetBlockFromTx, TxEnvelopeWrapper},
     },
     alloy::{
@@ -64,7 +64,7 @@ async fn broadcast_bundle(
         .await?;
 
     let tx = TransactionRequest::default()
-        .with_to(Address::ZERO)
+        .with_to(ADDRESS_BABE1.parse::<Address>()?)
         .with_nonce(nonce)
         .with_chain_id(CHAIN_ID)
         .with_input(envelopes)

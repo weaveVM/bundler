@@ -33,7 +33,7 @@ A bundle is a group of envelopes organized through the following process:
 2. The bundle is Borsh serialized according to the `BundleData` type
 3. The resulting serialization vector is compressed using Brotli compression
 4. The Borsh-Brotli serialized-compressed vector is added as `input` (calldata) to an EIP-1559 transaction
-5. The resulting bundle is broadcasted on WeaveVM with `target` set to `0x0000000000000000000000000000000000000000`
+5. The resulting bundle is broadcasted on WeaveVM with `target` set to `0xbabe1` address ([`0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057`](https://explorer.wvm.dev/address/0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057))
 
 ```rust
 pub struct BundleData {
@@ -139,6 +139,14 @@ graph LR
 * Multiple instances of the same envelope within a bundle are permissible and do not invalidate either the bundle or the envelopes themselves. These duplicate instances are treated as copies sharing the same timestamp when found in a single bundle. When appearing across different bundles, they are considered distinct instances with their respective bundle timestamps (valid envelopes and considered as copies of distinct timestamps).
 
 * Since envelopes are implemented as signed Legacy transactions, they are strictly reserved for data settling purposes. Their use for any other purpose is explicitly prohibited for the envelope's signer security.
+
+### Bundles Versioning
+
+Bundles versioning is based on the bundles target address:
+
+| Bundle Version  | Bundler Target Acronym | Bundler Target Address |
+| :-------------: |:-------------:| :-------------:|
+| v0.1.0      | `0xbabe1`     | [0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057](https://explorer.wvm.dev/address/0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057)| 
 
 ## Bundler Library
 
