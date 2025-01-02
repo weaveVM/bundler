@@ -25,7 +25,7 @@ WeaveVM Bundler is a data protocol specification and library that introduces the
 - **Bundle**: An EIP-1559 transaction that groups multiple envelopes (`n > 0`), enabling efficient transaction batching and processing.
 - **Bundler Lib**: Refers to the Bundler Rust library that facilitates composing and propagating Bundler's bundles.
 
-### Bundle Format
+### 1. Bundle Format
 
 A bundle is a group of envelopes organized through the following process:
 
@@ -65,7 +65,15 @@ flowchart TB
     style Serialization fill:#1a202c,stroke:#2d3748,color:#fff
 ```
 
-### Envelope Format
+### Bundles Versioning
+
+Bundles versioning is based on the bundles target address:
+
+| Bundle Version  | Bundler Target Acronym | Bundler Target Address |
+| :-------------: |:-------------:| :-------------:|
+| v0.1.0      | `0xbabe1`     | [0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057](https://explorer.wvm.dev/address/0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057)| 
+
+### 2. Envelope Format
 
 An envelope is a signed Legacy EVM transaction with the following MUSTs and restrictions.
 
@@ -110,7 +118,7 @@ pub struct TxEnvelopeWrapper {
      - Any purpose other than data settling
 
 
-### Transaction Type Choice
+### 3. Transaction Type Choice
 The selection of transaction types follows clear efficiency principles. Legacy transactions were chosen for envelopes due to their minimal size (144 bytes), making them the most space-efficient option for data storage. EIP-1559 transactions were adopted for bundles as the widely accepted standard for transaction processing.
 
 ```mermaid
@@ -133,20 +141,12 @@ graph LR
     style D fill:#1a365d,stroke:#2a4365,color:#fff,stroke-width:5.3px
 ```
 
-### Notes
+### 4. Notes
 * Envelopes exist as signed Legacy transactions within bundles but operate under distinct processing rules - they are not individually processed by the WeaveVM network as transactions, despite having the structure of a Legacy transaction (signed data with a Transaction type). Instead, they are bundled together and processed as a single onchain transaction (therefore the advantage of Bundler).
 
 * Multiple instances of the same envelope within a bundle are permissible and do not invalidate either the bundle or the envelopes themselves. These duplicate instances are treated as copies sharing the same timestamp when found in a single bundle. When appearing across different bundles, they are considered distinct instances with their respective bundle timestamps (valid envelopes and considered as copies of distinct timestamps).
 
 * Since envelopes are implemented as signed Legacy transactions, they are strictly reserved for data settling purposes. Their use for any other purpose is explicitly prohibited for the envelope's signer security.
-
-### Bundles Versioning
-
-Bundles versioning is based on the bundles target address:
-
-| Bundle Version  | Bundler Target Acronym | Bundler Target Address |
-| :-------------: |:-------------:| :-------------:|
-| v0.1.0      | `0xbabe1`     | [0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057](https://explorer.wvm.dev/address/0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057)| 
 
 ## Bundler Library
 
