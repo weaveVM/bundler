@@ -12,10 +12,10 @@ mod tests {
     #[tokio::test]
     async fn test_bundle_retrieval() {
         let bundle_txid =
-            "0xef8864362474f3a3a0c649068b0577bc3b71820720b845babdfdb715f83dbddd".to_string();
+            "0xc8ec20bd3ef5f692a9058614c231e2ad343db0825404437f5af9f1a655e8f724".to_string();
 
         let envelopes = Bundle::retrieve_envelopes(bundle_txid).await.unwrap();
-        println!("{:#?}", envelopes);
+        // println!("{:?}", envelopes);
         assert_ne!(envelopes.envelopes.len(), 0);
     }
 
@@ -57,7 +57,6 @@ mod tests {
         for _ in 0..2 {
             let random_calldata: String = generate_random_calldata(128_000); // 128 KB of random calldata
             let envelope_data = serde_json::to_vec(&random_calldata).unwrap();
-            // let envelope = Envelope::from(Some(envelope_data), None);
             let envelope = Envelope::new()
                 .data(Some(envelope_data))
                 .target(None)

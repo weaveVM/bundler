@@ -1,9 +1,11 @@
 use {
-    crate::utils::evm::{create_bundle, create_envelope, retrieve_bundle_data, retrieve_bundle_tx},
+    crate::utils::{
+        constants::ADDRESS_BABE1,
+        evm::{create_bundle, create_envelope, retrieve_bundle_data, retrieve_bundle_tx},
+    },
     alloy::consensus::{Transaction, TxEnvelope},
     borsh::{from_slice, to_vec},
     borsh_derive::{BorshDeserialize, BorshSerialize},
-    eyre::OptionExt,
     serde::{self, Deserialize, Serialize},
     std::io::{Read, Write},
 };
@@ -103,8 +105,13 @@ impl Bundle {
     }
 
     pub async fn retrieve_envelopes(bundle_txid: String) -> eyre::Result<BundleData> {
-        let bundle = retrieve_bundle_tx(bundle_txid).await?;
-        let res = retrieve_bundle_data(bundle.calldata).await;
+        let bundle: BundleTxMetadata = retrieve_bundle_tx(bundle_txid).await?;
+        // assert the bundle versioning by checking target address
+        assert_eq!(
+            bundle.to.to_lowercase(),
+            ADDRESS_BABE1.to_string().to_ascii_lowercase()
+        );
+        let res: BundleData = retrieve_bundle_data(bundle.calldata).await;
         Ok(res)
     }
 }
@@ -192,18 +199,20 @@ impl TxEnvelopeWrapper {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GetBlockFromTx {
-    pub number: String,
-    pub hash: String,
+pub struct BundleTxMetadata {
+    pub block_number: String,
+    pub block_hash: String,
     pub calldata: String,
+    pub to: String,
 }
 
-impl GetBlockFromTx {
-    pub fn from(number: String, hash: String, calldata: String) -> Self {
-        GetBlockFromTx {
-            number,
-            hash,
+impl BundleTxMetadata {
+    pub fn from(number: String, hash: String, calldata: String, to: String) -> Self {
+        BundleTxMetadata {
+            block_number: number,
+            block_hash: hash,
             calldata,
+            to,
         }
     }
 }

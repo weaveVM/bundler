@@ -1,7 +1,7 @@
 use {
     crate::utils::{
         constants::{ADDRESS_BABE1, CHAIN_ID, WVM_RPC_URL},
-        types::{BundleData, Envelope, GetBlockFromTx, TxEnvelopeWrapper},
+        types::{BundleData, BundleTxMetadata, Envelope, TxEnvelopeWrapper},
     },
     alloy::{
         consensus::TxEnvelope,
@@ -12,7 +12,7 @@ use {
         signers::local::PrivateKeySigner,
         transports::http::{Client, Http},
     },
-    eyre::Result,
+    eyre::{OptionExt, Result},
     futures::future::join_all,
     hex,
     rand::Rng,
@@ -143,21 +143,28 @@ pub fn generate_random_calldata(length: usize) -> String {
     calldata
 }
 
-pub async fn retrieve_bundle_tx(txid: String) -> Result<GetBlockFromTx> {
+pub async fn retrieve_bundle_tx(txid: String) -> Result<BundleTxMetadata> {
     let provider = create_evm_http_client(WVM_RPC_URL).await?;
     let txid = B256::from_str(&txid)?;
-    let tx = provider.get_transaction_by_hash(txid).await?;
-    let tx_json = serde_json::json!(&tx.unwrap());
+    let tx = provider
+        .get_transaction_by_hash(txid)
+        .await?
+        .ok_or_eyre("error retrieving tx");
+    let tx_json = serde_json::json!(&tx?);
 
     let block_hash: &str = tx_json["blockHash"].as_str().unwrap_or("0x");
     let block_number_hex: &str = tx_json["blockNumber"].as_str().unwrap_or("0x");
     let block_number_dec = U256::from_str(block_number_hex).unwrap_or(U256::ZERO);
     let calldata: &str = tx_json["input"].as_str().unwrap_or("0x");
+    let to: &str = tx_json["to"]
+        .as_str()
+        .unwrap_or("0x0000000000000000000000000000000000000000");
 
-    let res = GetBlockFromTx::from(
+    let res = BundleTxMetadata::from(
         block_number_dec.to_string(),
         block_hash.to_string(),
         calldata.to_string(),
+        to.to_string(),
     );
     Ok(res)
 }
