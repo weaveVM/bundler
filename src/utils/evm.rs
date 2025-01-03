@@ -173,5 +173,12 @@ pub async fn retrieve_bundle_data(calldata: String) -> BundleData {
     let byte_array = hex::decode(calldata.trim_start_matches("0x")).expect("decoding failed");
     let unbrotli = TxEnvelopeWrapper::brotli_decompress(byte_array);
     let unborsh: BundleData = TxEnvelopeWrapper::borsh_der(unbrotli);
+    // validate envelopes MUSTs
+    for envelope in &unborsh.envelopes {
+        assert_eq!(envelope.nonce, 0);
+        assert_eq!(envelope.gas_limit, 0);
+        assert_eq!(envelope.gas_price, 0);
+    }
+
     unborsh
 }

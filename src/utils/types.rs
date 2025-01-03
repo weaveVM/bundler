@@ -207,10 +207,10 @@ pub struct BundleTxMetadata {
 }
 
 impl BundleTxMetadata {
-    pub fn from(number: String, hash: String, calldata: String, to: String) -> Self {
+    pub fn from(block_number: String, block_hash: String, calldata: String, to: String) -> Self {
         BundleTxMetadata {
-            block_number: number,
-            block_hash: hash,
+            block_number,
+            block_hash,
             calldata,
             to,
         }
