@@ -4,10 +4,9 @@ pub mod utils;
 mod tests {
     use eyre::Ok;
 
-    use crate::utils::{
-        evm::generate_random_calldata,
-        types::{Bundle, Envelope},
-    };
+    use crate::utils::core::bundle::Bundle;
+    use crate::utils::core::envelope::Envelope;
+    use crate::utils::evm::generate_random_calldata;
 
     #[tokio::test]
     async fn test_bundle_retrieval() {
@@ -20,9 +19,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_send_bundle_with_target() -> eyre::Result<()> {
+    async fn test_send_bundle_with_target() {
         // will fail until a tWVM funded EOA (pk) is provided
-        let private_key = String::from("");
+        let private_key = String::from("ABCD");
 
         let mut envelopes: Vec<Envelope> = vec![];
 
@@ -33,7 +32,8 @@ mod tests {
             let envelope = Envelope::new()
                 .data(Some(envelope_data))
                 .target(Some(envelope_target))
-                .build()?;
+                .build()
+                .unwrap();
             envelopes.push(envelope);
         }
 
@@ -41,14 +41,15 @@ mod tests {
             .private_key(private_key)
             .envelopes(envelopes)
             .build()
+            .expect("REASON")
             .propagate()
-            .await?;
+            .await
+            .unwrap();
         assert_eq!(bundle_tx.len(), 66);
-        Ok(())
     }
 
     #[tokio::test]
-    async fn test_send_bundle_without_target() -> eyre::Result<()> {
+    async fn test_send_bundle_without_target() {
         // will fail until a tWVM funded EOA (pk) is provided, take care about nonce if same wallet is used as in test_send_bundle_with_target
         let private_key = String::from("");
 
@@ -60,7 +61,8 @@ mod tests {
             let envelope = Envelope::new()
                 .data(Some(envelope_data))
                 .target(None)
-                .build()?;
+                .build()
+                .unwrap();
             envelopes.push(envelope);
         }
 
@@ -68,9 +70,10 @@ mod tests {
             .private_key(private_key)
             .envelopes(envelopes)
             .build()
+            .unwrap()
             .propagate()
-            .await?;
+            .await
+            .unwrap();
         assert_eq!(bundle_tx.len(), 66);
-        Ok(())
     }
 }
