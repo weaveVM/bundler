@@ -159,7 +159,9 @@ bundler = { git = "https://github.com/weaveVM/bundler", branch = "main" }
 ### Build an envelope, build a bundle
 
 ```rust
-use bundler::utils::types::{Bundle, Envelope};
+use bundler::utils::core::envelope::Envelope;
+use bundler::utils::core::bundle::Bundle;
+
 
 // Envelope
 let envelope = Envelope::new()
