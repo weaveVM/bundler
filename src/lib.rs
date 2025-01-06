@@ -21,7 +21,7 @@ mod tests {
     #[tokio::test]
     async fn test_send_bundle_with_target() {
         // will fail until a tWVM funded EOA (pk) is provided
-        let private_key = String::from("ABCD");
+        let private_key = String::from("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b");
 
         let mut envelopes: Vec<Envelope> = vec![];
 
@@ -51,7 +51,7 @@ mod tests {
     #[tokio::test]
     async fn test_send_bundle_without_target() {
         // will fail until a tWVM funded EOA (pk) is provided, take care about nonce if same wallet is used as in test_send_bundle_with_target
-        let private_key = String::from("");
+        let private_key = String::from("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b");
 
         let mut envelopes: Vec<Envelope> = vec![];
 
