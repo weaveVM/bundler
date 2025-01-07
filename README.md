@@ -212,5 +212,46 @@ async fn send_bundle_without_target() -> eyre::Result<String> {
 
 For more examples, check the tests in [lib.rs](./src/lib.rs) and have a look over [types](./src/utils/types.rs)
 
+## SSTORE2 VS WeaveVM L1 calldata
+In the comparison below, we tested data settling of 1MB of non-zero bytes. WeaveVM's pricing of non-zero bytes (8 gas) and large transaction data size limit (8MB) allows us to fit the whole MB in a single transaction, paying a single overhead fee.
+
+| Chain | File Size (bytes) | Number of Contracts/Tx | Gas Used | Gas Price (Gwei) | Cost in Native | Native Price (USD) | Total (USD) |
+|-------|------------------|----------------------|-----------|-----------------|----------------|------------------|------------|
+| WeaveVM L1 Calldata | 1,000,000 | 1 | 8,500,000  (8M for calldata & 500k as base gas fee) | 1 Gwei | - | - | ~$0.05 |
+| Ethereum L1 | 1,000,000 | 41 | 202,835,200 gas | 20 Gwei | 4.056704 | $3641.98 | $14774.43 |
+| Polygon Sidechain | 1,000,000 | 41 | 202,835,200 gas | 40 Gwei (L1: 20 Gwei) | 8.113408 | $0.52 | $4.21 |
+| BSC L1 | 1,000,000 | 41 | 202,835,200 gas | 5 Gwei | 1.014176 | $717.59 | $727.76 |
+| Arbitrum (Optimistic L2) | 1,000,000 | 41 | 202,835,200 gas (+15,000,000 L1 gas) | 0.1 Gwei (L1: 20 Gwei) | 0.020284 (+0.128168 L1 fee) | $3641.98 | $540.66 |
+| Avalanche L1 | 1,000,000 | 41 | 202,835,200 gas | 25 Gwei | 5.070880 | $43.90 | $222.61 |
+| Base (Optimistic L2) | 1,000,000 | 41 | 202,835,200 gas (+15,000,000 L1 gas) | 0.001 Gwei (L1: 20 Gwei) | 0.000203 (+0.128168 L1 fee) | $3641.98 | $467.52 |
+| Optimism (Optimistic L2) | 1,000,000 | 41 | 202,835,200 gas (+15,000,000 L1 gas) | 0.001 Gwei (L1: 20 Gwei) | 0.000203 (+0.128168 L1 fee) | $3641.98 | $467.52 |
+| Blast (Optimistic L2) | 1,000,000 | 41 | 202,835,200 gas (+15,000,000 L1 gas) | 0.001 Gwei (L1: 20 Gwei) | 0.000203 (+0.128168 L1 fee) | $3641.98 | $467.52 |
+| Linea (ZK L2) | 1,000,000 | 41 | 202,835,200 gas (+12,000,000 L1 gas) | 0.05 Gwei (L1: 20 Gwei) | 0.010142 (+0.072095 L1 fee) | $3641.98 | $299.50 |
+| Scroll (ZK L2) | 1,000,000 | 41 | 202,835,200 gas (+12,000,000 L1 gas) | 0.05 Gwei (L1: 20 Gwei) | 0.010142 (+0.072095 L1 fee) | $3641.98 | $299.50 |
+| Moonbeam (Polkadot) | 1,000,000 | 41 | 202,835,200 gas (+NaN L1 gas) | 100 Gwei | 20.283520 | $0.27 | $5.40 |
+| Polygon zkEVM (ZK L2) | 1,000,000 | 41 | 202,835,200 gas (+12,000,000 L1 gas) | 0.05 Gwei (L1: 20 Gwei) | 0.010142 (+0.072095 L1 fee) | $3641.98 | $299.50 |
+| Solana L1 | 1,000,000 | 98 | 490,000 imports | N/A | 0.000495 (0.000005 deposit) | $217.67 | $0.11 |
+
+## SSTORE2 VS WeaveVM L1 Calldata VS WeaveVM Bundler
+Now let's take the data even higher, but for simplicity, let's not fit the whole data in a single WeaveVM L1 calldata transaction. Instead, we'll split it into 1MB transactions (creating multiple data settlement overhead fees): 5MB, 5 txs of 1 MB each
+
+| Chain | File Size (bytes) | Number of Contracts/Tx | Gas Used | Gas Price (Gwei) | Cost in Native | Native Price (USD) | Total (USD) |
+|-------|------------------|----------------------|-----------|-----------------|----------------|------------------|------------|
+| WeaveVM Bundler| 5,000,000 | 1 | 40,500,000 (40M for calldata & 500k as base gas fee) | 1 Gwei | - | - | ~$0.25-$0.27 |
+| WeaveVM L1 Calldata | 5,000,000 | 5 | 42,500,000 (40M for calldata & 2.5M as base gas fee) | 1 Gwei | - | - | ~$0.22 |
+| Ethereum L1 | 5,000,000 | 204 | 1,009,228,800 gas | 20 Gwei | 20.184576 | $3650.62 | $73686.22 |
+| Polygon Sidechain | 5,000,000 | 204 | 1,009,228,800 gas | 40 Gwei (L1: 20 Gwei) | 40.369152 | $0.52 | $20.95 |
+| BSC L1 | 5,000,000 | 204 | 1,009,228,800 gas | 5 Gwei | 5.046144 | $717.75 | $3621.87 |
+| Arbitrum (Optimistic L2) | 5,000,000 | 204 | 1,009,228,800 gas (+80,000,000 L1 gas) | 0.1 Gwei (L1: 20 Gwei) | 0.100923 (+0.640836 L1 fee) | $3650.62 | $2707.88 |
+| Avalanche L1 | 5,000,000 | 204 | 1,009,228,800 gas | 25 Gwei | 25.230720 | $44.01 | $1110.40 |
+| Base (Optimistic L2) | 5,000,000 | 204 | 1,009,228,800 gas (+80,000,000 L1 gas) | 0.001 Gwei (L1: 20 Gwei) | 0.001009 (+0.640836 L1 fee) | $3650.62 | $2343.13 |
+| Optimism (Optimistic L2) | 5,000,000 | 204 | 1,009,228,800 gas (+80,000,000 L1 gas) | 0.001 Gwei (L1: 20 Gwei) | 0.001009 (+0.640836 L1 fee) | $3650.62 | $2343.13 |
+| Blast (Optimistic L2) | 5,000,000 | 204 | 1,009,228,800 gas (+80,000,000 L1 gas) | 0.001 Gwei (L1: 20 Gwei) | 0.001009 (+0.640836 L1 fee) | $3650.62 | $2343.13 |
+| Linea (ZK L2) | 5,000,000 | 204 | 1,009,228,800 gas (+60,000,000 L1 gas) | 0.05 Gwei (L1: 20 Gwei) | 0.050461 (+0.360470 L1 fee) | $3650.62 | $1500.16 |
+| Scroll (ZK L2) | 5,000,000 | 204 | 1,009,228,800 gas (+60,000,000 L1 gas) | 0.05 Gwei (L1: 20 Gwei) | 0.050461 (+0.360470 L1 fee) | $3650.62 | $1500.16 |
+| Moonbeam (Polkadot) | 5,000,000 | 204 | 1,009,228,800 gas (+NaN L1 gas) | 100 Gwei | 100.922880 | $0.27 | $26.94 |
+| Polygon zkEVM (ZK L2) | 5,000,000 | 204 | 1,009,228,800 gas (+60,000,000 L1 gas) | 0.05 Gwei (L1: 20 Gwei) | 0.050461 (+0.360470 L1 fee) | $3650.62 | $1500.16 |
+| Solana L1 | 5,000,000 | 489 tx | 2445.00k imports | N/A | 0.002468 (0.000023 deposit) | $218.44 | $0.54 |
+
 ## License
 This project is licensed under the [MIT License](./LICENSE)
