@@ -233,7 +233,7 @@ In the comparison below, we tested data settling of 1MB of non-zero bytes. Weave
 | Solana L1 | 1,000,000 | 98 | 490,000 imports | N/A | 0.000495 (0.000005 deposit) | $217.67 | $0.11 |
 
 ## SSTORE2 VS WeaveVM L1 Calldata VS WeaveVM Bundler
-Now let's take the data even higher, but for simplicity, let's not fit the whole data in a single WeaveVM L1 calldata transaction. Instead, we'll split it into 1MB transactions (creating multiple data settlement overhead fees): 5MB, 5 txs of 1 MB each
+Now let's take the data even higher, but for simplicity, let's not fit the whole data in a single WeaveVM L1 calldata transaction. Instead, we'll split it into 1MB transactions (creating multiple data settlement overhead fees): 5MB, 5 txs of 1 MB each:
 
 | Chain | File Size (bytes) | Number of Contracts/Tx | Gas Used | Gas Price (Gwei) | Cost in Native | Native Price (USD) | Total (USD) |
 |-------|------------------|----------------------|-----------|-----------------|----------------|------------------|------------|
@@ -252,6 +252,10 @@ Now let's take the data even higher, but for simplicity, let's not fit the whole
 | Moonbeam (Polkadot) | 5,000,000 | 204 | 1,009,228,800 gas (+NaN L1 gas) | 100 Gwei | 100.922880 | $0.27 | $26.94 |
 | Polygon zkEVM (ZK L2) | 5,000,000 | 204 | 1,009,228,800 gas (+60,000,000 L1 gas) | 0.05 Gwei (L1: 20 Gwei) | 0.050461 (+0.360470 L1 fee) | $3650.62 | $1500.16 |
 | Solana L1 | 5,000,000 | 489 tx | 2445.00k imports | N/A | 0.002468 (0.000023 deposit) | $218.44 | $0.54 |
+
+### Table data sources
+* [WeaveVM calculator](https://www.wvm.dev/calculator)
+* [EVM storage calculator](https://swader.github.io/soroban/#calculator)
 
 ## License
 This project is licensed under the [MIT License](./LICENSE)
