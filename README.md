@@ -212,9 +212,9 @@ async fn send_bundle_without_target() -> eyre::Result<String> {
 
 For more examples, check the tests in [lib.rs](./src/lib.rs) and have a look over [types](./src/utils/types.rs)
 
-## HTTP Server
+## HTTP API
 
-- Base endpoint: 
+- Base endpoint: https://bundler.wvm.network/
 
 ### Retrieve envelopes
 

@@ -2,4 +2,6 @@
 
 .env
 .idea
-./.idea
+./.idea.shuttle*
+Secrets*.toml
+.shuttle/
