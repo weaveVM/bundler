@@ -212,6 +212,16 @@ async fn send_bundle_without_target() -> eyre::Result<String> {
 
 For more examples, check the tests in [lib.rs](./src/lib.rs) and have a look over [types](./src/utils/types.rs)
 
+## HTTP Server
+
+- Base endpoint: 
+
+### Retrieve envelopes
+
+```bash
+GET /v1/envelopes/:txid
+```
+
 ## Cost Efficiency: some comparisons
 
 ### SSTORE2 VS WeaveVM L1 calldata
