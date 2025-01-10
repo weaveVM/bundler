@@ -23,6 +23,7 @@ WeaveVM Bundler is a data protocol specification and library that introduces the
 - **Bundler**: Refers to the data protocol specification of the EVM bundled transactions on WeaveVM.
 - **Envelope**: A legacy EVM transaction that serves as the fundamental building block and composition unit of a Bundle.
 - **Bundle**: An EIP-1559 transaction that groups multiple envelopes (`n > 0`), enabling efficient transaction batching and processing.
+- **Superbundle**: A transaction that carries multiple bundles.
 - **Bundler Lib**: Refers to the Bundler Rust library that facilitates composing and propagating Bundler's bundles.
 
 ### 1. Bundle Format
