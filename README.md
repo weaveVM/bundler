@@ -216,10 +216,15 @@ For more examples, check the tests in [lib.rs](./src/lib.rs) and have a look ove
 
 - Base endpoint: https://bundler.wvm.network/
 
-### Retrieve envelopes
+### Retrieve full envelopes data of a given bundle
 
 ```bash
-GET /v1/envelopes/:txid
+GET /v1/envelopes/:bundle_txid
+```
+### Retrieve envelopes ids of a given bundle
+
+```bash
+GET /v1/envelopes/ids/:bundle_txid
 ```
 
 ## Cost Efficiency: some comparisons
