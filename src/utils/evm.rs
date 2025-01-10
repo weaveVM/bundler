@@ -4,7 +4,9 @@ use crate::utils::core::envelope::Envelope;
 use crate::utils::core::tx_envelope_writer::TxEnvelopeWrapper;
 use crate::utils::errors::Error;
 use {
-    crate::utils::constants::{ADDRESS_BABE1, CHAIN_ID, WVM_RPC_URL},
+    crate::utils::constants::{
+        ADDRESS_BABE1, BLOCK_GAS_LIMIT, CHAIN_ID, GAS_PRIORITY_MULTIPLIER, WVM_RPC_URL,
+    },
     alloy::{
         consensus::TxEnvelope,
         network::{EthereumWallet, TransactionBuilder},
@@ -78,6 +80,8 @@ async fn broadcast_bundle(
         let mut nonce = provider
             .get_transaction_count(signer.clone().address())
             .await?;
+        let mut max_priority_fee_per_gas: u128 = 1_000_000_000;
+        let mut max_fee_per_gas: u128 = 2_000_000_000;
 
         println!("Initial nonce: {:?}", nonce);
 
@@ -94,8 +98,8 @@ async fn broadcast_bundle(
                 .with_input(envelopes.clone())
                 .with_value(U256::from(0))
                 .with_gas_limit(490_000_000)
-                .with_max_priority_fee_per_gas(1_000_000_000)
-                .with_max_fee_per_gas(2_000_000_000);
+                .with_max_priority_fee_per_gas(max_priority_fee_per_gas)
+                .with_max_fee_per_gas(max_fee_per_gas);
 
             let tx_envelope: alloy::consensus::TxEnvelope = tx.build(&wallet).await?;
 
@@ -109,7 +113,14 @@ async fn broadcast_bundle(
                         .contains("replacement transaction underpriced") =>
                 {
                     println!("Transaction underpriced, trying next nonce...");
-                    nonce += 1; // Increment nonce if underpriced
+                    nonce += 1; // increment nonce if underpriced
+
+                    if (max_fee_per_gas < BLOCK_GAS_LIMIT
+                        && max_priority_fee_per_gas < BLOCK_GAS_LIMIT)
+                    {
+                        max_priority_fee_per_gas *= 11 / 10; // 1.1 -> 10% increment
+                        max_fee_per_gas *= 11 / 10; // same
+                    }
                 }
                 Err(e) => {
                     eprintln!("Unexpected error: {:?}", e);
