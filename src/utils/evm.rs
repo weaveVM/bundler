@@ -74,26 +74,49 @@ async fn broadcast_bundle(
     if let Some(priv_key) = private_key {
         let signer: PrivateKeySigner = priv_key.parse()?;
         let wallet = EthereumWallet::from(signer.clone());
-        let nonce = provider
+
+        let mut nonce = provider
             .get_transaction_count(signer.clone().address())
             .await?;
 
-        let tx = TransactionRequest::default()
-            .with_to(ADDRESS_BABE1.parse::<Address>()?)
-            .with_nonce(nonce)
-            .with_chain_id(CHAIN_ID)
-            .with_input(envelopes)
-            .with_value(U256::from(0))
-            .with_gas_limit(490_000_000)
-            .with_max_priority_fee_per_gas(1_000_000_000)
-            .with_max_fee_per_gas(2_000_000_000);
-        let tx_envelope: alloy::consensus::TxEnvelope = tx.build(&wallet).await?;
-        let tx: alloy::providers::PendingTransactionBuilder<
-            Http<Client>,
-            alloy::network::Ethereum,
-        > = provider.send_tx_envelope(tx_envelope).await?;
+        println!("Initial nonce: {:?}", nonce);
 
-        Ok(tx)
+        let mut attempt = 0;
+
+        loop {
+            attempt += 1;
+            println!("Broadcast attempt: {}", attempt);
+
+            let tx = TransactionRequest::default()
+                .with_to(ADDRESS_BABE1.parse::<Address>()?)
+                .with_nonce(nonce)
+                .with_chain_id(CHAIN_ID)
+                .with_input(envelopes.clone())
+                .with_value(U256::from(0))
+                .with_gas_limit(490_000_000)
+                .with_max_priority_fee_per_gas(1_000_000_000)
+                .with_max_fee_per_gas(2_000_000_000);
+
+            let tx_envelope: alloy::consensus::TxEnvelope = tx.build(&wallet).await?;
+
+            match provider.send_tx_envelope(tx_envelope.clone()).await {
+                Ok(tx) => {
+                    println!("Transaction successfully broadcasted with nonce: {}", nonce);
+                    return Ok(tx);
+                }
+                Err(e)
+                    if e.to_string()
+                        .contains("replacement transaction underpriced") =>
+                {
+                    println!("Transaction underpriced, trying next nonce...");
+                    nonce += 1; // Increment nonce if underpriced
+                }
+                Err(e) => {
+                    eprintln!("Unexpected error: {:?}", e);
+                    return Err(e.into());
+                }
+            }
+        }
     } else {
         Err(Error::PrivateKeyNeeded)
     }
