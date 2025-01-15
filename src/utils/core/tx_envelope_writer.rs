@@ -1,5 +1,7 @@
 use crate::utils::core::bundle_data::BundleData;
+use crate::utils::core::envelope::Envelope;
 use crate::utils::core::envelope_signature::EnvelopeSignature;
+use crate::utils::core::tags::Tag;
 use alloy::consensus::Transaction;
 use alloy::consensus::TxEnvelope;
 use borsh::{from_slice, to_vec};
@@ -26,10 +28,11 @@ pub struct TxEnvelopeWrapper {
     pub input: String,
     pub hash: String,
     pub signature: EnvelopeSignature,
+    pub tags: Option<Vec<Tag>>,
 }
 
 impl TxEnvelopeWrapper {
-    pub fn from_envelope(envelope: TxEnvelope) -> Self {
+    pub fn from_envelope(envelope: TxEnvelope, envelope_metadata: Envelope) -> Self {
         let sig: alloy::signers::Signature = envelope.signature().clone();
 
         let env_sig = EnvelopeSignature {
@@ -48,6 +51,7 @@ impl TxEnvelopeWrapper {
             input: envelope.input().to_string(),
             hash: envelope.tx_hash().to_string(),
             signature: env_sig,
+            tags: envelope_metadata.tags,
         }
     }
 

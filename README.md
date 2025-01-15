@@ -162,12 +162,14 @@ bundler = { git = "https://github.com/weaveVM/bundler", branch = "main" }
 ```rust
 use bundler::utils::core::envelope::Envelope;
 use bundler::utils::core::bundle::Bundle;
+use bundler::utils::core::tags::Tag;
 
 
 // Envelope
 let envelope = Envelope::new()
     .data(byte_vec)
     .target(address)
+    .tags(tags)
     .build()?;
 
 // Bundle
@@ -209,6 +211,46 @@ async fn send_bundle_without_target() -> eyre::Result<String> {
         
     Ok(bundle_tx)
 }
+```
+
+### Example: Send tagged envelopes
+
+```rust
+    async fn send_envelope_with_tags() -> eyre::Result<String> {
+        // will fail until a tWVM funded EOA (pk) is provided
+        let private_key = String::from("");
+
+        let mut envelopes: Vec<Envelope> = vec![];
+        
+        // add your tags to a vector
+        let tags = vec![Tag::new(
+            "Content-Type".to_string(),
+            "text/plain".to_string(),
+        )];
+
+        for _ in 0..1 {
+            let random_calldata: String = generate_random_calldata(128_000); // 128 KB of random calldata
+            let envelope_data = serde_json::to_vec(&random_calldata).unwrap();
+            let envelope = Envelope::new()
+                .data(Some(envelope_data))
+                .target(None)
+                .tags(Some(tags.clone())) // register your tags
+                .build()
+                .unwrap();
+            envelopes.push(envelope);
+        }
+
+        let bundle_tx = Bundle::new()
+            .private_key(private_key)
+            .envelopes(envelopes)
+            .build()
+            .expect("REASON")
+            .propagate()
+            .await
+            .unwrap();
+        
+        Ok(bundle_tx)
+    }
 ```
 
 For more examples, check the tests in [lib.rs](./src/lib.rs) and have a look over [types](./src/utils/types.rs)
