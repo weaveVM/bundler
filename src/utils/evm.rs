@@ -151,10 +151,10 @@ pub async fn create_bundle(
         .map(|(i, input)| {
             let pk = private_key.clone();
             task::spawn(async move {
-                match create_envelope(Some(&pk), input).await {
+                match create_envelope(Some(&pk), input.clone()).await {
                     Ok(tx) => {
                         println!("created tx count {}", i);
-                        Ok(TxEnvelopeWrapper::from_envelope(tx))
+                        Ok(TxEnvelopeWrapper::from_envelope(tx, input))
                     }
                     Err(e) => Err(e),
                 }
