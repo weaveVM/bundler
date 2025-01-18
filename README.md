@@ -79,6 +79,11 @@ Bundles versioning is based on the bundles target address:
 An envelope is a signed Legacy EVM transaction with the following MUSTs and restrictions.
 
 ```rs
+pub struct Tag {
+    pub name: String,
+    pub value: String,
+}
+
 pub struct EnvelopeSignature {
     pub y_parity: bool,
     pub r: String,
@@ -95,6 +100,7 @@ pub struct TxEnvelopeWrapper {
     pub input: String,
     pub hash: String,
     pub signature: EnvelopeSignature,
+    pub tags: Option<Vec<Tag>>,
 }
 ```
 
@@ -106,6 +112,7 @@ pub struct TxEnvelopeWrapper {
 
 2. **Size Restrictions**
    * Total Borsh-Brotli compressed envelopes (Bundle data) MUST be under 9 MB
+   * Total Tags bytes size must be <= 2048 bytes before compression.
 
 3. **Signature Requirements**
    * each envelope MUST have a valid signature
