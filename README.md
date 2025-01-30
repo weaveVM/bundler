@@ -10,6 +10,8 @@ WeaveVM Bundler is a data protocol specification and library that introduces the
 
 ***Bundler as data protocol and library is still in PoC (Proof of Concept) phase - not recommended for production usage, testing purposes only.***
 
+For the JS/TS version of WeaveVM bundles, [click here](https://github.com/weavevm/weavevm-bundles-js).
+
 ### Advantages of WeaveVM bundled transactions
 
 * Reduces transaction overhead fees from multiple fees (`n`) per `n` transaction to a single fee per bundle of envelopes (`n` transactions)
