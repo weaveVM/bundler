@@ -100,7 +100,7 @@ mod tests {
             String::from("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b");
 
         let mut envelopes: Vec<Envelope> = vec![];
-        
+
         let tags = vec![Tag::new(
             "Content-Type".to_string(),
             "text/plain".to_string(),
