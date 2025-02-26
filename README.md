@@ -75,7 +75,7 @@ Bundles versioning is based on the bundles target address:
 | Bundle Version  | Bundler Target Acronym | Bundler Target Address |
 | :-------------: |:-------------:| :-------------:|
 | v0.1.0      | `0xbabe1`     | [0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057](https://explorer.wvm.dev/address/0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057)| 
-
+easy
 ### 2. Envelope Format
 
 An envelope is a signed Legacy EVM transaction with the following MUSTs and restrictions.
@@ -272,6 +272,12 @@ For more examples, check the tests in [lib.rs](./src/lib.rs) and have a look ove
 
 ```bash
 GET /v1/envelopes/:bundle_txid
+```
+
+### Retrieve full envelopes data of a given bundle (with `from`'s envelope property derived from sig)
+
+```bash
+GET /v1/envelopes-full/:bundle_txid
 ```
 ### Retrieve envelopes ids of a given bundle
 

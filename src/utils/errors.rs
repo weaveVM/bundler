@@ -1,4 +1,3 @@
-use crate::utils::errors;
 use alloy::hex::FromHexError;
 use alloy::network::{Ethereum, TransactionBuilderError};
 use alloy::signers::local::LocalSignerError;
