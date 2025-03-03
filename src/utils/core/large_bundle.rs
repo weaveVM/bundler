@@ -1,6 +1,4 @@
 use crate::utils::constants::{ADDRESS_BABE2, LB_CHUNK_MAX_SIZE};
-use crate::utils::core::bundle_data::BundleData;
-use crate::utils::core::bundle_tx_metadata::BundleTxMetadata;
 use crate::utils::core::envelope::Envelope;
 use crate::utils::core::tags::Tag;
 use crate::utils::errors::Error;
@@ -111,7 +109,10 @@ impl LargeBundle {
             chunks_index += 1;
             let chunk_hash = tx.tx_hash().to_string();
             chunks_receipts.push(chunk_hash.clone());
-            println!("propagated chunks: index #{} - hash: {}", chunks_index, chunk_hash);
+            println!(
+                "propagated chunks: index #{} - hash: {}",
+                chunks_index, chunk_hash
+            );
         }
 
         self.chunks_receipts = Some(chunks_receipts);
@@ -142,12 +143,15 @@ impl LargeBundle {
                 "chunks_count".to_string(),
                 chunks_receipts.len().to_string(),
             ),
+            Tag::new("Content-Type".to_string(), "application/json".to_string()),
         ];
         let receipts_envelope = vec![Envelope::new().data(Some(data)).tags(Some(tags)).build()?];
 
         let tx = create_bundle(receipts_envelope, private_key.clone())
             .await
             .map_err(|_| Error::BundleNotCreated)?;
+
+        println!("LARGE BUNDLE HASH: {}", tx.tx_hash().to_string());
 
         Ok(tx.tx_hash().to_string())
     }
