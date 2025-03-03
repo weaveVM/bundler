@@ -101,13 +101,13 @@ mod tests {
 
         let mut envelopes: Vec<Envelope> = vec![];
 
-        let tags = vec![Tag::new(
-            "Content-Type".to_string(),
-            "text/plain".to_string(),
-        )];
+        let tags = vec![
+            Tag::new("Protocol".to_string(), "large-bundle".to_string()),
+            Tag::new("chunk".to_string(), "0".to_string()),
+        ];
 
         for _ in 0..1 {
-            let random_calldata: String = generate_random_calldata(128_000); // 128 KB of random calldata
+            let random_calldata: String = generate_random_calldata(8_388_608); // 8 MB of random calldata
             let envelope_data = serde_json::to_vec(&random_calldata).unwrap();
             let envelope = Envelope::new()
                 .data(Some(envelope_data))
@@ -126,6 +126,7 @@ mod tests {
             .propagate()
             .await
             .unwrap();
+        println!("LB BUNDLE TXID: {}", bundle_tx);
         assert_eq!(bundle_tx.len(), 66);
     }
 }
