@@ -73,7 +73,7 @@ Bundles versioning is based on the bundles target address:
 | Bundle Version  | Bundler Target Acronym | Bundler Target Address |
 | :-------------: |:-------------:| :-------------:|
 | v0.1.0      | `0xbabe1`     | [0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057](https://explorer.wvm.dev/address/0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057)| 
-easy
+
 ### 2. Envelope Format
 
 An envelope is a signed Legacy EVM transaction with the following MUSTs and restrictions.
