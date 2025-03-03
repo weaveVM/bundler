@@ -4,3 +4,6 @@ pub const GAS_PRIORITY_MULTIPLIER: f32 = 1.1; // 10%
 pub const TAGS_SIZE_LIMIT: usize = 2048; // in bytes;
 pub const WVM_RPC_URL: &str = "https://testnet-rpc.wvm.dev";
 pub const ADDRESS_BABE1: &str = "0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057";
+pub const ADDRESS_BABE2: &str = "0xbabe2dCAf248F2F1214dF2a471D77bC849a2Ce84";
+pub const LB_CHUNK_MAX_SIZE: u32 = 4_194_304; // 4MB
+pub const ONE_MB_IN_BYTES: u32 = 1048576; // 1MB
