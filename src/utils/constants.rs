@@ -6,4 +6,12 @@ pub const WVM_RPC_URL: &str = "https://testnet-rpc.wvm.dev";
 pub const ADDRESS_BABE1: &str = "0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057";
 pub const ADDRESS_BABE2: &str = "0xbabe2dCAf248F2F1214dF2a471D77bC849a2Ce84";
 pub const LB_CHUNK_MAX_SIZE: u32 = 4_194_304; // 4MB
-pub const ONE_MB_IN_BYTES: u32 = 1048576; // 1MB
+pub const ONE_MB_IN_BYTES: u32 = 1_048_576; // 1MB
+pub const ONE_KILOBYTE_IN_BYTES: u32 = 1024;
+pub const LB_THEORETICAL_SIZE_LIMIT: u64 =
+    246 * ONE_KILOBYTE_IN_BYTES as u64 * ONE_MB_IN_BYTES as u64;
+// 1 GB
+pub const LB_SAFE_MAX_SIZE_LIMIT: u64 =
+    (ONE_KILOBYTE_IN_BYTES * ONE_KILOBYTE_IN_BYTES * ONE_KILOBYTE_IN_BYTES) as u64;
+pub const MAX_THEORETICAL_CHUNKS_IN_LB: u32 = 61680;
+pub const MAX_SAFE_CHUNKS_IN_LB: u32 = 256; // 1GB

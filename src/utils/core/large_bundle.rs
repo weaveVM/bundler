@@ -1,4 +1,6 @@
-use crate::utils::constants::{ADDRESS_BABE1, ADDRESS_BABE2, LB_CHUNK_MAX_SIZE};
+use crate::utils::constants::{
+    ADDRESS_BABE1, ADDRESS_BABE2, LB_CHUNK_MAX_SIZE, LB_SAFE_MAX_SIZE_LIMIT, MAX_SAFE_CHUNKS_IN_LB,
+};
 use crate::utils::core::bundle::Bundle;
 use crate::utils::core::bundle_tx_metadata::BundleTxMetadata;
 use crate::utils::core::envelope::Envelope;
@@ -51,7 +53,9 @@ impl LargeBundle {
             .ok_or(Error::EnvelopesNeeded)
             .unwrap_or_default();
         let data_len = data.len() as u32;
-        assert!(data_len >= LB_CHUNK_MAX_SIZE);
+
+        // data limits safety check: min 4MB - max 1GB
+        assert!(data_len >= LB_CHUNK_MAX_SIZE && data_len <= LB_SAFE_MAX_SIZE_LIMIT as u32);
 
         let chunks_count =
             data_len / LB_CHUNK_MAX_SIZE + ((data_len % LB_CHUNK_MAX_SIZE) / LB_CHUNK_MAX_SIZE);
@@ -82,6 +86,9 @@ impl LargeBundle {
             .chunks
             .filter(|c| !c.is_empty())
             .ok_or(Error::EnvelopesNeeded)?;
+
+        // additional check, 256 chunks == 1GB
+        assert!(chunks.len() as u32 <= MAX_SAFE_CHUNKS_IN_LB);
 
         let res = LargeBundle {
             data: Some(data),
