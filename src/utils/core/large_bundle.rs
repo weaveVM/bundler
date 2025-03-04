@@ -1,5 +1,5 @@
 use crate::utils::constants::{
-    ADDRESS_BABE1, ADDRESS_BABE2, LB_CHUNK_MAX_SIZE, LB_SAFE_MAX_SIZE_LIMIT, MAX_SAFE_CHUNKS_IN_LB,
+    ADDRESS_BABE2, LB_CHUNK_MAX_SIZE, LB_SAFE_MAX_SIZE_LIMIT, MAX_SAFE_CHUNKS_IN_LB,
 };
 use crate::utils::core::bundle::Bundle;
 use crate::utils::core::bundle_tx_metadata::BundleTxMetadata;
