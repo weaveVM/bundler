@@ -53,19 +53,22 @@ impl Bundle {
         let envelopes = self.envelopes.ok_or(Error::EnvelopesNeeded)?;
         let private_key = self.private_key.ok_or(Error::PrivateKeyNeeded)?;
 
-        let tx = create_bundle(envelopes, private_key)
+        let tx = create_bundle(envelopes, private_key, ADDRESS_BABE1)
             .await
             .map_err(|_| Error::BundleNotCreated)?;
         let hash = tx.tx_hash().to_string();
         Ok(hash)
     }
 
-    pub async fn retrieve_envelopes(bundle_txid: String) -> Result<BundleData, Error> {
+    pub async fn retrieve_envelopes(
+        bundle_txid: String,
+        version: &str,
+    ) -> Result<BundleData, Error> {
         let bundle: BundleTxMetadata = retrieve_bundle_tx(bundle_txid)
             .await
             .map_err(|_| Error::BundleRetrievalProblem)?;
         // assert the bundle versioning by checking target address
-        if bundle.to.to_lowercase() != ADDRESS_BABE1.to_string().to_ascii_lowercase() {
+        if bundle.to.to_lowercase() != version.to_ascii_lowercase() {
             return Err(Error::UnverifiedAddress);
         }
 

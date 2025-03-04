@@ -110,7 +110,7 @@ impl LargeBundle {
         for chunk in chunks {
             let tags = vec![(Tag::new("chunk_index".to_string(), chunks_index.to_string()))];
             let envelope = vec![Envelope::new().data(Some(chunk)).tags(Some(tags)).build()?];
-            let tx = create_bundle(envelope, private_key.clone())
+            let tx = create_bundle(envelope, private_key.clone(), ADDRESS_BABE2)
                 .await
                 .map_err(|_| Error::BundleNotCreated)?;
             chunks_index += 1;
@@ -145,7 +145,7 @@ impl LargeBundle {
         ];
         let receipts_envelope = vec![Envelope::new().data(Some(data)).tags(Some(tags)).build()?];
 
-        let tx = create_bundle(receipts_envelope, private_key.clone())
+        let tx = create_bundle(receipts_envelope, private_key.clone(), ADDRESS_BABE2)
             .await
             .map_err(|_| Error::BundleNotCreated)?;
 
@@ -157,7 +157,7 @@ impl LargeBundle {
             .await
             .map_err(|_| Error::BundleRetrievalProblem)?;
         // assert the bundle versioning by checking target address
-        if bundle.to.to_lowercase() != ADDRESS_BABE1.to_string().to_ascii_lowercase() {
+        if bundle.to.to_lowercase() != ADDRESS_BABE2.to_string().to_ascii_lowercase() {
             return Err(Error::UnverifiedAddress);
         }
 
@@ -191,15 +191,14 @@ impl LargeBundle {
             .into_iter()
             .map(|receipt| async move {
                 // println!("UNBUNDLING {}", receipt);
-                let receipt_bundle =
-                    Bundle::retrieve_envelopes(receipt.clone())
-                        .await
-                        .map_err(|e| {
-                            Error::Other(format!(
-                                "Failed to retrieve bundle for receipt {}: {}",
-                                receipt, e
-                            ))
-                        })?;
+                let receipt_bundle = Bundle::retrieve_envelopes(receipt.clone(), ADDRESS_BABE2)
+                    .await
+                    .map_err(|e| {
+                        Error::Other(format!(
+                            "Failed to retrieve bundle for receipt {}: {}",
+                            receipt, e
+                        ))
+                    })?;
                 let receipt_writer = receipt_bundle
                     .envelopes
                     .get(0)

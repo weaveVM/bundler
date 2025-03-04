@@ -68,6 +68,7 @@ async fn broadcast_bundle(
     envelopes: Vec<u8>,
     provider: &RootProvider<Http<Client>>,
     private_key: Option<String>,
+    version: &str,
 ) -> Result<
     alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum>,
     Error,
@@ -91,7 +92,7 @@ async fn broadcast_bundle(
             println!("Broadcast attempt: {}", attempt);
 
             let tx = TransactionRequest::default()
-                .with_to(ADDRESS_BABE1.parse::<Address>()?)
+                .with_to(version.parse::<Address>()?)
                 .with_nonce(nonce)
                 .with_chain_id(CHAIN_ID)
                 .with_input(envelopes.clone())
@@ -135,6 +136,7 @@ async fn broadcast_bundle(
 pub async fn create_bundle(
     envelope_inputs: Vec<Envelope>,
     private_key: String,
+    version: &str,
 ) -> Result<
     alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum>,
     Error,
@@ -174,7 +176,7 @@ pub async fn create_bundle(
     let compressed = TxEnvelopeWrapper::brotli_compress(&serialized);
 
     let tx: alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum> =
-        broadcast_bundle(compressed, &provider, Some(private_key)).await?;
+        broadcast_bundle(compressed, &provider, Some(private_key), version).await?;
 
     Ok(tx)
 }
