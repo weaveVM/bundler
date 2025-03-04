@@ -1,13 +1,12 @@
 use crate::utils::constants::{ADDRESS_BABE1, ADDRESS_BABE2, LB_CHUNK_MAX_SIZE};
+use crate::utils::core::bundle::Bundle;
 use crate::utils::core::bundle_tx_metadata::BundleTxMetadata;
 use crate::utils::core::envelope::Envelope;
 use crate::utils::core::tags::Tag;
 use crate::utils::errors::Error;
 use crate::utils::evm::{create_bundle, retrieve_bundle_data, retrieve_bundle_tx};
-use crate::utils::core::bundle::Bundle;
-use futures::{self};
 use eyre::OptionExt;
-
+use futures::{self};
 
 #[derive(Debug, Default, Clone)]
 pub struct LargeBundle {
@@ -65,8 +64,6 @@ impl LargeBundle {
             chunks.push(data_chunk);
         }
 
-        println!("chunks count: {}", chunks_count);
-
         self.chunks = Some(chunks);
         self
     }
@@ -112,10 +109,10 @@ impl LargeBundle {
             chunks_index += 1;
             let chunk_hash = tx.tx_hash().to_string();
             chunks_receipts.push(chunk_hash.clone());
-            println!(
-                "propagated chunks: index #{} - hash: {}",
-                chunks_index, chunk_hash
-            );
+            // println!(
+            //     "propagated chunks: index #{} - hash: {}",
+            //     chunks_index, chunk_hash
+            // );
         }
 
         self.chunks_receipts = Some(chunks_receipts);
@@ -144,8 +141,6 @@ impl LargeBundle {
         let tx = create_bundle(receipts_envelope, private_key.clone())
             .await
             .map_err(|_| Error::BundleNotCreated)?;
-
-        println!("LARGE BUNDLE HASH: {}", tx.tx_hash().to_string());
 
         Ok(tx.tx_hash().to_string())
     }
@@ -183,8 +178,16 @@ impl LargeBundle {
             .clone()
             .into_iter()
             .map(|receipt| async move {
-                println!("UNBUNDLING {}", receipt);
-                let receipt_bundle = Bundle::retrieve_envelopes(receipt).await?;
+                // println!("UNBUNDLING {}", receipt);
+                let receipt_bundle =
+                    Bundle::retrieve_envelopes(receipt.clone())
+                        .await
+                        .map_err(|e| {
+                            Error::Other(format!(
+                                "Failed to retrieve bundle for receipt {}: {}",
+                                receipt, e
+                            ))
+                        })?;
                 let receipt_writer = receipt_bundle
                     .envelopes
                     .get(0)
