@@ -1,8 +1,13 @@
-use crate::utils::constants::{ADDRESS_BABE2, LB_CHUNK_MAX_SIZE};
+use crate::utils::constants::{ADDRESS_BABE1, ADDRESS_BABE2, LB_CHUNK_MAX_SIZE};
+use crate::utils::core::bundle_tx_metadata::BundleTxMetadata;
 use crate::utils::core::envelope::Envelope;
 use crate::utils::core::tags::Tag;
 use crate::utils::errors::Error;
 use crate::utils::evm::{create_bundle, retrieve_bundle_data, retrieve_bundle_tx};
+use crate::utils::core::bundle::Bundle;
+use futures::{self};
+use eyre::OptionExt;
+
 
 #[derive(Debug, Default, Clone)]
 pub struct LargeBundle {
@@ -89,8 +94,6 @@ impl LargeBundle {
             owner_sig: self.owner_sig,
         };
 
-        // println!("{:?}", res);
-
         Ok(res)
     }
 
@@ -123,15 +126,6 @@ impl LargeBundle {
     pub async fn finalize(self) -> Result<String, Error> {
         let private_key: String = self.clone().private_key.ok_or(Error::PrivateKeyNeeded)?;
         let chunks_receipts = self.chunks_receipts.ok_or(Error::EnvelopesNeeded)?;
-        // reversal code:
-        /*
-           let chunks_receipts: Vec<String> = serde_json::from_str(
-           &String::from_utf8(data)
-           .map_err(|e| Error::Other(e.to_string()))?
-           ).map_err(|e| Error::Other(e.to_string()))?;
-
-        */
-
         // Vec<String> -> stringified Vec<String> (String) -> &[u8]-> Vec<u8>
         let data = serde_json::to_string(&chunks_receipts)
             .map_err(|e| Error::Other(e.to_string()))?
@@ -156,16 +150,52 @@ impl LargeBundle {
         Ok(tx.tx_hash().to_string())
     }
 
-    // pub async fn retrieve_envelopes(bundle_txid: String) -> Result<BundleData, Error> {
-    //     let bundle: BundleTxMetadata = retrieve_bundle_tx(bundle_txid)
-    //         .await
-    //         .map_err(|_| Error::BundleRetrievalProblem)?;
-    //     // assert the bundle versioning by checking target address
-    //     if bundle.to.to_lowercase() != ADDRESS_BABE2.to_string().to_ascii_lowercase() {
-    //         return Err(Error::UnverifiedAddress);
-    //     }
+    pub async fn retrieve_chunks_receipts(bundle_txid: String) -> Result<LargeBundle, Error> {
+        let bundle: BundleTxMetadata = retrieve_bundle_tx(bundle_txid)
+            .await
+            .map_err(|_| Error::BundleRetrievalProblem)?;
+        // assert the bundle versioning by checking target address
+        if bundle.to.to_lowercase() != ADDRESS_BABE1.to_string().to_ascii_lowercase() {
+            return Err(Error::UnverifiedAddress);
+        }
 
-    //     let res: BundleData = retrieve_bundle_data(bundle.calldata).await;
-    //     Ok(res)
-    // }
+        let large_bundle = retrieve_bundle_data(bundle.calldata).await;
+        let chunks_receipts = large_bundle.envelopes.get(0).ok_or_eyre(Error::Other(
+            "Error: cannot reconstruct Large Envelope".to_string(),
+        ))?;
+        let receipts_data = hex::decode(&chunks_receipts.input.trim_start_matches("0x"))
+            .map_err(|e| Error::Other(e.to_string()))?;
+        let chunks_receipts: Vec<String> = serde_json::from_str(
+            &String::from_utf8(receipts_data).map_err(|e| Error::Other(e.to_string()))?,
+        )
+        .map_err(|e| Error::Other(e.to_string()))?;
+
+        Ok(Self {
+            chunks_receipts: Some(chunks_receipts),
+            ..Default::default()
+        })
+    }
+
+    pub async fn reconstruct_large_bundle(self) -> Result<Vec<u8>, Error> {
+        let chunks_receipts = self.chunks_receipts.ok_or_else(|| Error::EnvelopesNeeded)?;
+
+        let receipt_futures = chunks_receipts
+            .clone()
+            .into_iter()
+            .map(|receipt| async move {
+                let receipt_bundle = Bundle::retrieve_envelopes(receipt).await?;
+                let receipt_writer = receipt_bundle
+                    .envelopes
+                    .get(0)
+                    .ok_or_else(|| Error::Other("Error: no envelopes found".to_string()))?;
+                let receipt_data = hex::decode(&receipt_writer.input.trim_start_matches("0x"))
+                    .map_err(|e| Error::Other(e.to_string()))?;
+                Ok::<Vec<u8>, Error>(receipt_data)
+            });
+
+        let results = futures::future::try_join_all(receipt_futures)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+        Ok(results.into_iter().flatten().collect::<Vec<u8>>())
+    }
 }

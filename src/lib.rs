@@ -153,4 +153,19 @@ mod tests {
 
         assert_eq!(large_bundle.len(), 66);
     }
+
+    #[tokio::test]
+    async fn test_retrieve_large_bundle() {
+        let large_bundle = LargeBundle::retrieve_chunks_receipts(
+            "0xcdcbb18db0636b8722b4379b50d304a5a480e78f86c06c7df359718eac24ead3".to_string(),
+        )
+        .await
+        .unwrap()
+        .reconstruct_large_bundle()
+        .await
+        .unwrap();
+
+        println!("LARGE BUNDLE: {:?}", large_bundle);
+        assert_ne!(large_bundle.len(), 0);
+    }
 }
