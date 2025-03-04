@@ -108,7 +108,7 @@ impl LargeBundle {
                 .map_err(|_| Error::BundleNotCreated)?;
             chunks_index += 1;
             let chunk_hash = tx.tx_hash().to_string();
-            chunks_receipts.push(chunk_hash.clone());
+            chunks_receipts.push(chunk_hash.clone().trim_start_matches("0x").to_string());
             // println!(
             //     "propagated chunks: index #{} - hash: {}",
             //     chunks_index, chunk_hash
@@ -165,8 +165,13 @@ impl LargeBundle {
         )
         .map_err(|e| Error::Other(e.to_string()))?;
 
+        let chunks_receipts_with_prefix: Vec<String> = chunks_receipts
+            .into_iter()
+            .map(|chunk| format!("0x{}", chunk))
+            .collect();
+
         Ok(Self {
-            chunks_receipts: Some(chunks_receipts),
+            chunks_receipts: Some(chunks_receipts_with_prefix),
             ..Default::default()
         })
     }

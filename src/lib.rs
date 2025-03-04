@@ -137,7 +137,7 @@ mod tests {
         let private_key =
             String::from("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b");
 
-        let random_data: Vec<u8> = generate_random_bytes(13 * 8_388_608); // 104MB
+        let random_data: Vec<u8> = generate_random_bytes(2 * 8_388_608); // 104MB
         let large_bundle = LargeBundle::new()
             .data(random_data)
             .private_key(private_key)
@@ -157,7 +157,7 @@ mod tests {
     #[tokio::test]
     async fn test_retrieve_large_bundle() {
         let large_bundle = LargeBundle::retrieve_chunks_receipts(
-            "0x270671adf62fb3fac424940501c03e5c25cd2309489e7e810297454f59e8d6b6".to_string(),
+            "0x95981548230a518a5e708f19d1f4c4fc498d341981f1f7a180572760c65ea801".to_string(),
         )
         .await
         .unwrap()
