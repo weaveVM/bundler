@@ -1,6 +1,6 @@
 [package]
 name = "bundler"
-version = "0.1.4"
+version = "0.2.4"
 edition = "2021"
 
 [lib]
@@ -28,3 +28,4 @@ thiserror = "2.0.9"
 shuttle-axum = "0.50.0"
 shuttle-runtime = "0.50.0"
 axum = "0.7.4"
+reqwest = "0.12.12"

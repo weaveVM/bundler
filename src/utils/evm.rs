@@ -3,6 +3,7 @@ use crate::utils::core::bundle_tx_metadata::BundleTxMetadata;
 use crate::utils::core::envelope::Envelope;
 use crate::utils::core::tx_envelope_writer::TxEnvelopeWrapper;
 use crate::utils::errors::Error;
+use alloy::signers::Signer;
 use {
     crate::utils::constants::{ADDRESS_BABE1, BLOCK_GAS_LIMIT, CHAIN_ID, WVM_RPC_URL},
     alloy::{
@@ -17,7 +18,7 @@ use {
     eyre::OptionExt,
     futures::future::join_all,
     hex,
-    rand::Rng,
+    rand::{thread_rng, Rng, RngCore},
     serde_json,
     std::str::FromStr,
     tokio::task,
@@ -67,6 +68,7 @@ async fn broadcast_bundle(
     envelopes: Vec<u8>,
     provider: &RootProvider<Http<Client>>,
     private_key: Option<String>,
+    version: &str,
 ) -> Result<
     alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum>,
     Error,
@@ -90,7 +92,7 @@ async fn broadcast_bundle(
             println!("Broadcast attempt: {}", attempt);
 
             let tx = TransactionRequest::default()
-                .with_to(ADDRESS_BABE1.parse::<Address>()?)
+                .with_to(version.parse::<Address>()?)
                 .with_nonce(nonce)
                 .with_chain_id(CHAIN_ID)
                 .with_input(envelopes.clone())
@@ -134,6 +136,7 @@ async fn broadcast_bundle(
 pub async fn create_bundle(
     envelope_inputs: Vec<Envelope>,
     private_key: String,
+    version: &str,
 ) -> Result<
     alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum>,
     Error,
@@ -173,7 +176,7 @@ pub async fn create_bundle(
     let compressed = TxEnvelopeWrapper::brotli_compress(&serialized);
 
     let tx: alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum> =
-        broadcast_bundle(compressed, &provider, Some(private_key)).await?;
+        broadcast_bundle(compressed, &provider, Some(private_key), version).await?;
 
     Ok(tx)
 }
@@ -196,6 +199,12 @@ pub fn generate_random_calldata(length: usize) -> String {
     }
 
     calldata
+}
+
+pub fn generate_random_bytes(length: usize) -> Vec<u8> {
+    let mut data = vec![0u8; length];
+    thread_rng().fill_bytes(&mut data);
+    data
 }
 
 pub async fn retrieve_bundle_tx(txid: String) -> Result<BundleTxMetadata, Error> {
@@ -236,4 +245,21 @@ pub async fn retrieve_bundle_data(calldata: String) -> BundleData {
     }
 
     unborsh
+}
+
+pub async fn sign_data(private_key: Option<&str>, data: Vec<u8>) -> Result<Vec<u8>, Error> {
+    if let Some(priv_key) = private_key {
+        let signer: PrivateKeySigner = priv_key
+            .parse()
+            .map_err(|_| Error::PrivateKeyParsingError)?;
+
+        let signed_msg = signer
+            .sign_message(&data)
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+        // [u8; 65] to Vec<u8>
+        Ok(signed_msg.as_bytes().to_vec())
+    } else {
+        Err(Error::PrivateKeyNeeded)
+    }
 }

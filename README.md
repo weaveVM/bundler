@@ -25,7 +25,7 @@ For the JS/TS version of WeaveVM bundles, [click here](https://github.com/weavev
 - **Bundler**: Refers to the data protocol specification of the EVM bundled transactions on WeaveVM.
 - **Envelope**: A legacy EVM transaction that serves as the fundamental building block and composition unit of a Bundle.
 - **Bundle**: An EIP-1559 transaction that groups multiple envelopes (`n > 0`), enabling efficient transaction batching and processing.
-- **Superbundle**: A transaction that carries multiple bundles.
+- **Large Bundle**: A transaction that carries multiple bundles.
 - **Bundler Lib**: Refers to the Bundler Rust library that facilitates composing and propagating Bundler's bundles.
 
 ### 1. Bundle Format
@@ -75,7 +75,8 @@ Bundles versioning is based on the bundles target address:
 | Bundle Version  | Bundler Target Acronym | Bundler Target Address |
 | :-------------: |:-------------:| :-------------:|
 | v0.1.0      | `0xbabe1`     | [0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057](https://explorer.wvm.dev/address/0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057)| 
-easy
+| v0.2.0      | `0xbabe2`     | [0xbabe2dCAf248F2F1214dF2a471D77bC849a2Ce84](https://explorer.wvm.dev/address/0xbabe2dCAf248F2F1214dF2a471D77bC849a2Ce84)| 
+
 ### 2. Envelope Format
 
 An envelope is a signed Legacy EVM transaction with the following MUSTs and restrictions.
@@ -158,6 +159,81 @@ graph LR
 
 * Since envelopes are implemented as signed Legacy transactions, they are strictly reserved for data settling purposes. Their use for any other purpose is explicitly prohibited for the envelope's signer security.
 
+## Large Bundle
+
+### About
+
+A Large Bundle is a bundle under version 0xbabe2 that exceeds the WeaveVM L1 and `0xbabe1` transaction size limits, introducing incredibly high size efficiency to data settling on WeaveVM. For example, with [Alphanet v0.4.0](https://blog.wvm.dev/alphanet-v4) running @ 500 mgas/s, a Large Bundle has a max size of 246 GB. For the sake of DevX and simplicity of the current 0xbabe2 stack, Large Bundles in the Bundler SDK have been limited to 1GB, while on the network level, the size is 246GB.
+
+### Architecture design
+
+Large Bundles are built on top of the Bundler data specification. In simple terms, a Large Bundle consists of `n` smaller chunks (standalone bundles) that are sequentially connected tail-to-head and then at the end the Large Bundle is a reference to all the sequentially related chunks, packing all of the chunks IDs in a single `0xbabe2` bundle and sending it to WeaveVM.
+
+```mermaid
+graph TD
+    Client[Client Application] --> |Creates large data| Bundler[Bundler SDK]
+    Bundler --> |Splits into chunks| Chunk1[Chunk 1 - 0xbabe2]
+    Bundler --> |Splits into chunks| Chunk2[Chunk 2 - 0xbabe2]
+    Bundler --> |Splits into chunks| Chunk3[Chunk 3 - 0xbabe2]
+    Bundler --> |Splits into chunks| ChunkN[Chunk N - 0xbabe2]
+    
+    Chunk1 --> |Sequential connection| Chunk2
+    Chunk2 --> |Sequential connection| Chunk3
+    Chunk3 --> |...| ChunkN
+    
+    Chunk1 --> |Submit to| WeaveVML1[WeaveVM L1]
+    Chunk2 --> |Submit to| WeaveVML1
+    Chunk3 --> |Submit to| WeaveVML1
+    ChunkN --> |Submit to| WeaveVML1
+    
+    Bundler --> |Creates Large Bundle with all chunk IDs| RefBundle[Large Bundle - 0xbabe2]
+    RefBundle --> |Submit to| WeaveVML1
+    
+    subgraph "Large Bundle Transactions Flow (Up to 246GB on network, 1GB in SDK (current))"
+        Chunk1
+        Chunk2
+        Chunk3
+        ChunkN
+        RefBundle
+    end
+```
+### Large Bundle Size Calculation
+
+#### Determining Number of Chunks
+
+To store a file of size S (in MB) with a chunk size C, the number of chunks (N) is calculated as:
+
+**N = ⌊S/C⌋ + [(S mod C) > 0]**
+
+Special case: **if S < C then N = 1**
+
+#### Maximum Theoretical Size
+
+The bundling actor collects all hash receipts of the chunks, orders them in a list, and uploads this list as a WeaveVM L1 transaction. The size components of a Large Bundle are:
+
+- 2 Brackets [ ] = 2 bytes
+- EVM transaction header without "0x" prefix = 64 bytes per hash
+- 2 bytes for comma and space (one less comma at the end, so subtract 2 from total) 
+- **Size per chunk's hash = 68 bytes**
+
+Therefore:
+**Total hashes size = 2 + (N × 68) - 2 = 68N bytes**
+
+#### Maximum Capacity Calculation
+
+- Maximum L1 transaction input size (`C_tx`) = 4 MB = 4_194_304 bytes
+- Maximum number of chunks (`Σn`) = `C_tx` ÷ 68 = 4_194_304 ÷ 68 = 61_680 chunks
+- **Maximum theoretical Large Bundle size (`C_max`) = `Σn` × `C_tx` = 61_680 × 4 MB = 246,720 MB ≈ 246.72 GB**
+
+
+### WeaveVM Bundles Limitation
+
+| Network gaslimit  | L1 tx input size | 0xbabe1 size | 0xbabe2 size |
+| :-------------: |:-------------:| :-------------:| :-------------:|
+| 500 mgas/s (current)    | 4MB    | 4MB | 246 GB |
+| 1 gigagas/s (upcoming)    | 8MB    | 8MB | 492 GB |
+
+
 ## Bundler Library
 
 ### Import Bundler in your project
@@ -165,8 +241,9 @@ graph LR
 ```toml
 bundler = { git = "https://github.com/weaveVM/bundler", branch = "main" }
 ```
+### 0xbabe1 Bundles
 
-### Build an envelope, build a bundle
+#### Build an envelope, build a bundle
 
 ```rust
 use bundler::utils::core::envelope::Envelope;
@@ -190,7 +267,7 @@ let bundle_tx = Bundle::new()
     .await?;
 ```
 
-### Example: Build a bundle packed with envelopes
+#### Example: Build a bundle packed with envelopes
 
 ```rust
 async fn send_bundle_without_target() -> eyre::Result<String> {
@@ -222,7 +299,7 @@ async fn send_bundle_without_target() -> eyre::Result<String> {
 }
 ```
 
-### Example: Send tagged envelopes
+#### Example: Send tagged envelopes
 
 ```rust
     async fn send_envelope_with_tags() -> eyre::Result<String> {
@@ -262,7 +339,49 @@ async fn send_bundle_without_target() -> eyre::Result<String> {
     }
 ```
 
-For more examples, check the tests in [lib.rs](./src/lib.rs) and have a look over [types](./src/utils/types.rs)
+### 0xbabe2 Large Bundle
+
+#### Example: construct and disperse a Large Bundle
+
+```rust
+use crate::utils::core::large_bundle::LargeBundle;
+
+    async fn send_large_bundle() -> eyre::Result<String> {
+        let private_key = String::from("");
+        let content_type = "text/plain".to_string();
+        let data = "~UwU~".repeat(4_000_000).as_bytes().to_vec();
+
+        let large_bundle = LargeBundle::new()
+            .data(data)
+            .private_key(private_key)
+            .content_type(content_type)
+            .chunk()
+            .build()?
+            .propagate_chunks()
+            .await?
+            .finalize()
+            .await?;
+
+        Ok(large_bundle_hash)
+    }
+```
+
+#### Example: Retrieve Large Bundle data
+
+```rust
+    async fn retrieve_large_bundle() -> eyre::Result<Vec<u8>> {
+        let large_bundle = LargeBundle::retrieve_chunks_receipts(
+            "0xb58684c24828f8a80205345897afa7aba478c23005e128e4cda037de6b9ca6fd".to_string(),
+        )
+        .await?
+        .reconstruct_large_bundle()
+        .await?;
+        
+        Ok(large_bundle)
+    }
+```
+
+For more examples, check the tests in [lib.rs](./src/lib.rs).
 
 ## HTTP API
 
@@ -283,6 +402,14 @@ GET /v1/envelopes-full/:bundle_txid
 
 ```bash
 GET /v1/envelopes/ids/:bundle_txid
+```
+
+> **N.B: All of the `/v1` methods (`0xbabe1`) are available under `/v2` for `0xbabe2` Large Bundles.**
+
+### Resolve the content of a Large Bundle (not efficient, experimental)
+
+```bash
+GET /v2/resolve/:large_bundle_txid
 ```
 
 ## Cost Efficiency: some comparisons
