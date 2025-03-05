@@ -10,7 +10,6 @@ pub mod utils;
 
 #[shuttle_runtime::main]
 async fn main() -> shuttle_axum::ShuttleAxum {
-
     let timeout_layer = TimeoutLayer::new(Duration::from_secs(3600));
     // server routes
     let router = Router::new()
