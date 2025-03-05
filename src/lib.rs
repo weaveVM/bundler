@@ -141,11 +141,14 @@ mod tests {
         // will fail until a tWVM funded EOA (pk) is provided, take care about nonce if same wallet is used as in test_send_bundle_with_target
         let private_key =
             String::from("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b");
+        let content_type = "text/plain".to_string();
+        let data = "~UwU~".repeat(4_000_000).as_bytes().to_vec();
 
-        let random_data: Vec<u8> = generate_random_bytes(2 * 8_388_608); // 104MB
+        // let random_data: Vec<u8> = generate_random_bytes(1 * 8_388_608); // 104MB
         let large_bundle = LargeBundle::new()
-            .data(random_data)
+            .data(data)
             .private_key(private_key)
+            .content_type(content_type)
             .chunk()
             .build()
             .unwrap()
@@ -156,21 +159,22 @@ mod tests {
             .await
             .unwrap();
 
+        // println!("{:?}", large_bundle);
+
         assert_eq!(large_bundle.len(), 66);
     }
 
     #[tokio::test]
     async fn test_retrieve_large_bundle() {
         let large_bundle = LargeBundle::retrieve_chunks_receipts(
-            "0xcbac1f78045b03553560190844b876107717bcf4239cefacbd7d4672f3607c36".to_string(),
+            "0xb58684c24828f8a80205345897afa7aba478c23005e128e4cda037de6b9ca6fd".to_string(),
         )
-        .await
-        .unwrap()
-        .reconstruct_large_bundle()
         .await
         .unwrap();
 
+        let bundle_hash = large_bundle.reconstruct_large_bundle().await.unwrap();
+
         // println!("LARGE BUNDLE: {:?}", large_bundle);
-        assert_ne!(large_bundle.len(), 0);
+        assert_ne!(bundle_hash.len(), 0);
     }
 }

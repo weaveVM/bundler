@@ -17,6 +17,7 @@ pub struct LargeBundle {
     pub owner_sig: Option<Vec<u8>>,
     pub chunks: Option<Vec<Vec<u8>>>,
     pub chunks_receipts: Option<Vec<String>>,
+    pub content_type: Option<String>,
 }
 
 impl LargeBundle {
@@ -27,6 +28,7 @@ impl LargeBundle {
             owner_sig: None,
             chunks: None,
             chunks_receipts: None,
+            content_type: None,
         }
     }
 
@@ -42,6 +44,11 @@ impl LargeBundle {
 
     pub fn add_data_sig(mut self, sig: Vec<u8>) -> Self {
         self.owner_sig = Some(sig);
+        self
+    }
+
+    pub fn content_type(mut self, content_type: String) -> Self {
+        self.content_type = Some(content_type);
         self
     }
 
@@ -87,6 +94,10 @@ impl LargeBundle {
             .filter(|c| !c.is_empty())
             .ok_or(Error::EnvelopesNeeded)?;
 
+        let content_type = self
+            .content_type
+            .unwrap_or("application/octet-stream".to_string());
+
         // additional check, 256 chunks == 1GB
         assert!(chunks.len() as u32 <= MAX_SAFE_CHUNKS_IN_LB);
 
@@ -94,6 +105,7 @@ impl LargeBundle {
             data: Some(data),
             private_key: Some(private_key),
             chunks: Some(chunks),
+            content_type: Some(content_type),
             chunks_receipts: self.chunks_receipts,
             owner_sig: self.owner_sig,
         };
@@ -138,10 +150,11 @@ impl LargeBundle {
         let tags: Vec<Tag> = vec![
             Tag::new("Protocol".to_string(), "Large-Bundle".to_string()),
             Tag::new(
-                "chunks_count".to_string(),
+                "Chunks-Count".to_string(),
                 chunks_receipts.len().to_string(),
             ),
             Tag::new("Content-Type".to_string(), "application/json".to_string()),
+            Tag::new("Data-Content-Type".to_string(), self.content_type.unwrap()),
         ];
         let receipts_envelope = vec![Envelope::new().data(Some(data)).tags(Some(tags)).build()?];
 
@@ -165,6 +178,18 @@ impl LargeBundle {
         let chunks_receipts = large_bundle.envelopes.get(0).ok_or_eyre(Error::Other(
             "Error: cannot reconstruct Large Envelope".to_string(),
         ))?;
+
+        // retrieve Large Bundle Data-Content-Type
+        let data_content_type = chunks_receipts
+            .clone()
+            .tags
+            .unwrap()
+            .iter()
+            .find(|tag| tag.name.to_lowercase() == "data-content-type")
+            .map(|tag| tag.value.clone())
+            .unwrap_or_default();
+
+        // retrieve Large Bundle chunk receipts
         let receipts_data = hex::decode(&chunks_receipts.input.trim_start_matches("0x"))
             .map_err(|e| Error::Other(e.to_string()))?;
         let chunks_receipts: Vec<String> = serde_json::from_str(
@@ -179,6 +204,7 @@ impl LargeBundle {
 
         Ok(Self {
             chunks_receipts: Some(chunks_receipts_with_prefix),
+            content_type: Some(data_content_type),
             ..Default::default()
         })
     }

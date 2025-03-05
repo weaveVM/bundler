@@ -342,22 +342,22 @@ async fn send_bundle_without_target() -> eyre::Result<String> {
 #### Example: construct and disperse a Large Bundle
 
 ```rust
-use crate::utils::evm::{generate_random_bytes, generate_random_calldata};
 use crate::utils::core::large_bundle::LargeBundle;
 
     async fn send_large_bundle() -> eyre::Result<String> {
-        // will fail until a tWVM funded EOA (pk) is provided, take care about nonce if same wallet is used
         let private_key = String::from("");
+        let content_type = "text/plain".to_string();
+        let data = "~UwU~".repeat(4_000_000).as_bytes().to_vec();
 
-        let random_data: Vec<u8> = generate_random_bytes(100 * 1_048_576); // 100MB
-        let large_bundle_hash = LargeBundle::new()
-            .data(random_data)
+        let large_bundle = LargeBundle::new()
+            .data(data)
             .private_key(private_key)
-            .chunk() // create chunks of 4MB each
+            .content_type(content_type)
+            .chunk()
             .build()?
-            .propagate_chunks() // propagate chunks on WeaveVM
+            .propagate_chunks()
             .await?
-            .finalize() // order the chunks in a final bundle (Large Bundle) and broadcast it to WeaveVM
+            .finalize()
             .await?;
 
         Ok(large_bundle_hash)
@@ -369,7 +369,7 @@ use crate::utils::core::large_bundle::LargeBundle;
 ```rust
     async fn retrieve_large_bundle() -> eyre::Result<Vec<u8>> {
         let large_bundle = LargeBundle::retrieve_chunks_receipts(
-            "0xcbac1f78045b03553560190844b876107717bcf4239cefacbd7d4672f3607c36".to_string(),
+            "0xb58684c24828f8a80205345897afa7aba478c23005e128e4cda037de6b9ca6fd".to_string(),
         )
         .await?
         .reconstruct_large_bundle()
@@ -402,7 +402,13 @@ GET /v1/envelopes-full/:bundle_txid
 GET /v1/envelopes/ids/:bundle_txid
 ```
 
-All of the `/v1` methods (`0xbabe1`) are available under `/v2` for `0xbabe2` Large Bundles.
+> **N.B: All of the `/v1` methods (`0xbabe1`) are available under `/v2` for `0xbabe2` Large Bundles.**
+
+### Resolve the content of a Large Bundle (not efficient, experimental)
+
+```bash
+GET /v2/resolve/:large_bundle_txid
+```
 
 ## Cost Efficiency: some comparisons
 
