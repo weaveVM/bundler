@@ -30,3 +30,4 @@ shuttle-runtime = "0.50.0"
 axum = "0.7.4"
 reqwest = "0.12.12"
 tower-http = {version = "0.6.2", features = ["timeout"]}
+bytes = "1.10.0"
