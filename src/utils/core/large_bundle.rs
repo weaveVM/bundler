@@ -4,6 +4,7 @@ use crate::utils::constants::{
 use crate::utils::core::bundle::Bundle;
 use crate::utils::core::bundle_tx_metadata::BundleTxMetadata;
 use crate::utils::core::envelope::Envelope;
+use crate::utils::core::super_account::SuperAccount;
 use crate::utils::core::tags::Tag;
 use crate::utils::errors::Error;
 use crate::utils::evm::{create_bundle, retrieve_bundle_data, retrieve_bundle_tx};
@@ -138,6 +139,109 @@ impl LargeBundle {
 
         Ok(self)
     }
+
+    // pub async fn propagate_chunks(mut self) -> Result<Self, Error> {
+    //     let mut chunks_index = 0;
+    //     let chunks = self.clone().chunks.ok_or(Error::EnvelopesNeeded)?;
+    //     let mut chunks_receipts: Vec<String> = Vec::new();
+    //     let private_key: String = self.clone().private_key.ok_or(Error::PrivateKeyNeeded)?;
+    //     let chunkers : Vec<String> =  SuperAccount::new()
+    //     .keystore_path((".bundler_keystores".to_string()))
+    //     .pwd("bundler-test".to_string())
+    //     .load_chunkers(None)
+    //     .await?.chunkers.ok_or_eyre("Error: cannot load chunkers")?
+    //     .iter()
+    //     .map(|signer| {
+    //         let private_key_bytes = signer.to_bytes();
+    //                     format!("{}", hex::encode(private_key_bytes))
+    //     })
+    //     .collect();
+
+    // println!("{:?}", chunkers);
+
+    //     // for chunk in chunks {
+    //     //     let tags = vec![(Tag::new("chunk_index".to_string(), chunks_index.to_string()))];
+    //     //     let envelope = vec![Envelope::new().data(Some(chunk)).tags(Some(tags)).build()?];
+    //     //     let tx = create_bundle(envelope, private_key.clone(), ADDRESS_BABE2)
+    //     //         .await
+    //     //         .map_err(|_| Error::BundleNotCreated)?;
+    //     //     chunks_index += 1;
+    //     //     let chunk_hash = tx.tx_hash().to_string();
+    //     //     chunks_receipts.push(chunk_hash.clone().trim_start_matches("0x").to_string());
+    //     // }
+
+    // // Create a vector to store all the task handles with their original indices
+    // let chunker_count = chunkers.len();
+    // let total_chunks = chunks.len();
+
+    // // Create a vector to store all task handles
+    // let mut tasks = Vec::with_capacity(chunker_count);
+
+    // // Divide chunks among threads
+    // for chunker_idx in 0..chunker_count {
+    //     // Clone the chunker for this thread
+    //     let chunker = chunkers[chunker_idx].clone();
+
+    //     // Calculate which chunk indices this thread will handle
+    //     let chunk_indices: Vec<usize> = (0..total_chunks)
+    //         .filter(|i| i % chunker_count == chunker_idx)
+    //         .collect();
+
+    //     // Get the specific chunks this thread will process
+    //     let thread_chunks: Vec<(usize, Vec<u8>)> = chunk_indices
+    //         .into_iter()
+    //         .map(|i| (i, chunks[i].clone()))
+    //         .collect();
+
+    //     // Spawn the task
+    //     let task = tokio::spawn(async move {
+    //         let mut thread_results = Vec::with_capacity(thread_chunks.len());
+
+    //         for (original_index, chunk) in thread_chunks {
+    //             // Create tags with chunk index
+    //             let tags = vec![(Tag::new("chunk_index".to_string(), original_index.to_string()))];
+
+    //             // Create envelope
+    //             let envelope = vec![Envelope::new().data(Some(chunk)).tags(Some(tags)).build()?];
+
+    //             // Create bundle
+    //             let tx = create_bundle(envelope, chunker.clone(), ADDRESS_BABE2)
+    //                 .await
+    //                 .map_err(|_| Error::BundleNotCreated)?;
+
+    //             // Get chunk hash
+    //             let chunk_hash = tx.tx_hash().to_string();
+    //             let receipt = chunk_hash.trim_start_matches("0x").to_string();
+
+    //             // Store result with original index
+    //             thread_results.push((original_index, receipt));
+    //         }
+
+    //         Ok::<Vec<(usize, String)>, Error>(thread_results)
+    //     });
+
+    //     tasks.push(task);
+    // }
+
+    // Collect results from all tasks
+    // let mut all_indexed_receipts = Vec::with_capacity(total_chunks);
+    // for task in tasks {
+    //     // Handle any task join errors
+    //     let thread_results = task.await.map_err(|e| Error::Other(e.to_string()))?;
+    //     // Add this thread's results to the overall results
+    //     all_indexed_receipts.extend(thread_results?);
+    // }
+
+    // // Sort the results by the original index
+    // all_indexed_receipts.sort_by_key(|(idx, _)| *idx);
+
+    // // Extract just the receipts, now in the correct order
+    // let chunks_receipts = all_indexed_receipts.into_iter().map(|(_, receipt)| receipt).collect();
+
+    //     self.chunks_receipts = Some(chunks_receipts);
+
+    //     Ok(self)
+    // }
 
     pub async fn finalize(self) -> Result<String, Error> {
         let private_key: String = self.clone().private_key.ok_or(Error::PrivateKeyNeeded)?;
