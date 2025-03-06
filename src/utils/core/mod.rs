@@ -5,5 +5,6 @@ pub mod envelope;
 pub mod envelope_signature;
 pub mod envelope_with_owner;
 pub mod large_bundle;
+pub mod super_account;
 pub mod tags;
 pub mod tx_envelope_writer;

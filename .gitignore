@@ -2,6 +2,7 @@
 
 .env
 .idea
+.bundler_keystores
 ./.idea.shuttle*
 Secrets*.toml
 .shuttle/

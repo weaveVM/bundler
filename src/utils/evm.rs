@@ -3,7 +3,8 @@ use crate::utils::core::bundle_tx_metadata::BundleTxMetadata;
 use crate::utils::core::envelope::Envelope;
 use crate::utils::core::tx_envelope_writer::TxEnvelopeWrapper;
 use crate::utils::errors::Error;
-use alloy::signers::Signer;
+use alloy::network::TxSigner;
+use alloy::{network::NetworkWallet, signers::Signer};
 use {
     crate::utils::constants::{ADDRESS_BABE1, BLOCK_GAS_LIMIT, CHAIN_ID, WVM_RPC_URL},
     alloy::{
@@ -11,8 +12,8 @@ use {
         network::{EthereumWallet, TransactionBuilder},
         primitives::{Address, B256, U256},
         providers::{Provider, ProviderBuilder, RootProvider},
-        rpc::types::TransactionRequest,
-        signers::local::PrivateKeySigner,
+        rpc::types::{Transaction, TransactionRequest},
+        signers::local::{LocalSigner, PrivateKeySigner},
         transports::http::{Client, Http},
     },
     eyre::OptionExt,
@@ -24,7 +25,10 @@ use {
     tokio::task,
 };
 
-async fn create_evm_http_client(rpc_url: &str) -> Result<RootProvider<Http<Client>>, Error> {
+pub type HttpClient = RootProvider<Http<Client>>;
+pub type AlloyPk = alloy::primitives::FixedBytes<32>;
+
+pub async fn create_evm_http_client(rpc_url: &str) -> Result<HttpClient, Error> {
     let rpc_url = rpc_url.parse().map_err(|_| Error::InvalidRpcUrl)?;
     let provider = ProviderBuilder::new().on_http(rpc_url);
     Ok(provider)
@@ -262,4 +266,52 @@ pub async fn sign_data(private_key: Option<&str>, data: Vec<u8>) -> Result<Vec<u
     } else {
         Err(Error::PrivateKeyNeeded)
     }
+}
+
+pub async fn send_wvm(
+    sender_pk: AlloyPk,
+    address_to: Address,
+    amount: u64,
+) -> Result<String, Error> {
+    let gas_price = U256::from(1_200_000_000);
+    // Convert ETH amount to Wei (1 ETH = 10^18 Wei)
+    let amount_wei = U256::from(amount);
+    let signer =
+        LocalSigner::from_bytes(&sender_pk).map_err(|err| Error::Other(err.to_string()))?;
+    let wallet = EthereumWallet::from(signer.clone());
+    let rpc_url = WVM_RPC_URL.parse().map_err(|_| Error::InvalidRpcUrl)?;
+    let provider = ProviderBuilder::new().wallet(wallet).on_http(rpc_url);
+    let nonce = provider.get_transaction_count(signer.address()).await?;
+
+    // let tx = TransactionRequest::default()
+    //     .with_to(address_to)
+    //     .with_value(amount_wei)
+
+    // // Send the transaction and wait for inclusion.
+    // let tx_hash = provider.send_transaction(tx).await?.watch().await.map_err(|err| Error::Other(err.to_string()))?;
+    // let txid = tx_hash.to_string();
+
+    // Build a transaction to send 100 wei from Alice to Bob.
+    // The `from` field is automatically filled to the first signer's address (Alice).
+    let tx = TransactionRequest::default()
+        .with_to(address_to)
+        // .with_nonce(0)
+        .with_value(amount_wei)
+        .with_gas_price(20_000_000_000)
+        .with_gas_limit(21_000)
+        .with_nonce(nonce)
+        .gas_limit(BLOCK_GAS_LIMIT.try_into().unwrap());
+
+    // Send the transaction and wait for the broadcast.
+    let pending_tx = provider.send_transaction(tx).await?;
+    let receipt = pending_tx
+        .get_receipt()
+        .await
+        .map_err(|err| Error::Other(err.to_string()))?;
+
+    println!(
+        "Pending transaction... {}",
+        receipt.transaction_hash.to_string()
+    );
+    Ok(receipt.transaction_hash.to_string())
 }
