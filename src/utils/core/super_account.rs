@@ -1,23 +1,19 @@
-use crate::utils::constants::{SAFE_CHUNK_TOPUP, WVM_RPC_URL};
+use crate::utils::constants::SAFE_CHUNK_TOPUP;
 use crate::utils::errors::Error;
-use crate::utils::evm::{create_evm_http_client, send_wvm, AlloyPk, HttpClient};
-use alloy::primitives::{Address, Bytes, B256, U256};
-use alloy::signers::{k256, local::LocalSigner, local::PrivateKeySigner, Signer};
+use crate::utils::evm::{send_wvm, AlloyPk};
+use alloy::primitives::{Address, B256};
+use alloy::signers::k256::Secp256k1;
+use alloy::signers::local::LocalSigner;
+use ecdsa::SigningKey;
 use eyre::OptionExt;
 use futures::future::join_all;
-use futures::stream::All;
-use futures::{stream, StreamExt};
 use rand::{thread_rng, RngCore};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use tokio::task;
-use tokio::time::Instant;
-
-use alloy::signers::k256::Secp256k1;
-use ecdsa::SigningKey;
-use std::str::FromStr;
 
 pub type Chunker = LocalSigner<SigningKey<Secp256k1>>;
 
@@ -59,12 +55,11 @@ impl SuperAccount {
             .clone()
             .ok_or_eyre("Error: chunkers not found")?;
         let funder = self.funder.ok_or_eyre("Error: funder not provided")?;
-        let http_client = create_evm_http_client(WVM_RPC_URL)
-            .await
-            .map_err(|err| Error::Other(err.to_string()))?;
+        // let http_client = create_evm_http_client(WVM_RPC_URL)
+        //     .await
+        //     .map_err(|err| Error::Other(err.to_string()))?;
 
         for chunker in chunkers {
-            println!("FUNDING {}", chunker.address());
             send_wvm(funder, chunker.address(), SAFE_CHUNK_TOPUP).await?;
         }
 
@@ -95,8 +90,6 @@ impl SuperAccount {
             let password = pwd.to_string();
 
             let handle = task::spawn(async move {
-                let task_start = Instant::now();
-
                 let mut rng = thread_rng();
                 let mut bytes = [0u8; 32];
                 rng.fill_bytes(&mut bytes);
@@ -124,29 +117,10 @@ impl SuperAccount {
         }
         join_all(handles).await;
 
-        for i in 0..5 {
-            let keystore_path = keystore_dir.join(format!("wallet_{}.json", i));
-
-            if keystore_path.exists() {
-                let recovered_signer = LocalSigner::decrypt_keystore(&keystore_path, &pwd)?;
-                println!(
-                    "Recovered wallet_{}: {} from {:?}",
-                    i,
-                    recovered_signer.address(),
-                    keystore_path
-                );
-            } else {
-                println!(
-                    "Keystore file for wallet_{} not found at {:?}",
-                    i, keystore_path
-                );
-            }
-        }
-
         Ok(self)
     }
 
-    pub async fn load_chunkers(mut self, count: Option<u32>) -> Result<Self, Error> {
+    pub async fn load_chunkers(mut self, input_count: Option<u32>) -> Result<Self, Error> {
         let mut chunkers: Vec<Chunker> = Vec::new();
         let path = self
             .clone()
@@ -158,7 +132,7 @@ impl SuperAccount {
             .ok_or_eyre("Error: keystore pwd not provided")?;
 
         let keystore_dir = Path::new(&path);
-        let count = fs::read_dir(keystore_dir)
+        let mut count = fs::read_dir(keystore_dir)
             .map_err(|err| Error::Other(err.to_string()))?
             .filter_map(|entry| entry.ok())
             .filter(|entry| {
@@ -167,13 +141,17 @@ impl SuperAccount {
             })
             .count();
 
+        if input_count.is_some() {
+            count = input_count.unwrap() as usize;
+        }
+
         for i in 0..count {
             let keystore_path = keystore_dir.join(format!("wallet_{}.json", i));
 
             if keystore_path.exists() {
                 let recovered_signer = LocalSigner::decrypt_keystore(&keystore_path, &pwd)?;
                 println!(
-                    "Recovered wallet_{}: {} from {:?}",
+                    "Loaded chunker wallet_{}: {} from {:?}",
                     i,
                     recovered_signer.address(),
                     keystore_path
@@ -181,7 +159,7 @@ impl SuperAccount {
                 chunkers.push(recovered_signer);
             } else {
                 println!(
-                    "Keystore file for wallet_{} not found at {:?}",
+                    "Keystore file for chunker wallet_{} not found at {:?}",
                     i, keystore_path
                 );
             }

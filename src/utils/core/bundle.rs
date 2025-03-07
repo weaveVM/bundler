@@ -53,7 +53,7 @@ impl Bundle {
         let envelopes = self.envelopes.ok_or(Error::EnvelopesNeeded)?;
         let private_key = self.private_key.ok_or(Error::PrivateKeyNeeded)?;
 
-        let tx = create_bundle(envelopes, private_key, ADDRESS_BABE1)
+        let tx = create_bundle(None, envelopes, private_key, ADDRESS_BABE1)
             .await
             .map_err(|_| Error::BundleNotCreated)?;
         let hash = tx.tx_hash().to_string();

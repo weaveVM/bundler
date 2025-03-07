@@ -1,3 +1,4 @@
+use crate::utils::constants::WVM_RPC_URL;
 use crate::utils::constants::{
     ADDRESS_BABE2, LB_CHUNK_MAX_SIZE, LB_SAFE_MAX_SIZE_LIMIT, MAX_SAFE_CHUNKS_IN_LB,
 };
@@ -7,9 +8,13 @@ use crate::utils::core::envelope::Envelope;
 use crate::utils::core::super_account::SuperAccount;
 use crate::utils::core::tags::Tag;
 use crate::utils::errors::Error;
-use crate::utils::evm::{create_bundle, retrieve_bundle_data, retrieve_bundle_tx};
+use crate::utils::evm::create_evm_http_client;
+use crate::utils::evm::{
+    create_bundle, create_bundle_sync, retrieve_bundle_data, retrieve_bundle_tx,
+};
 use eyre::OptionExt;
 use futures::{self};
+use std::sync::Arc;
 
 #[derive(Debug, Default, Clone)]
 pub struct LargeBundle {
@@ -99,7 +104,7 @@ impl LargeBundle {
             .content_type
             .unwrap_or("application/octet-stream".to_string());
 
-        // additional check, 256 chunks == 1GB
+        // additional check
         assert!(chunks.len() as u32 <= MAX_SAFE_CHUNKS_IN_LB);
 
         let res = LargeBundle {
@@ -123,125 +128,18 @@ impl LargeBundle {
         for chunk in chunks {
             let tags = vec![(Tag::new("chunk_index".to_string(), chunks_index.to_string()))];
             let envelope = vec![Envelope::new().data(Some(chunk)).tags(Some(tags)).build()?];
-            let tx = create_bundle(envelope, private_key.clone(), ADDRESS_BABE2)
+            let tx = create_bundle(None, envelope, private_key.clone(), ADDRESS_BABE2)
                 .await
                 .map_err(|_| Error::BundleNotCreated)?;
             chunks_index += 1;
             let chunk_hash = tx.tx_hash().to_string();
             chunks_receipts.push(chunk_hash.clone().trim_start_matches("0x").to_string());
-            // println!(
-            //     "propagated chunks: index #{} - hash: {}",
-            //     chunks_index, chunk_hash
-            // );
         }
 
         self.chunks_receipts = Some(chunks_receipts);
 
         Ok(self)
     }
-
-    // pub async fn propagate_chunks(mut self) -> Result<Self, Error> {
-    //     let mut chunks_index = 0;
-    //     let chunks = self.clone().chunks.ok_or(Error::EnvelopesNeeded)?;
-    //     let mut chunks_receipts: Vec<String> = Vec::new();
-    //     let private_key: String = self.clone().private_key.ok_or(Error::PrivateKeyNeeded)?;
-    //     let chunkers : Vec<String> =  SuperAccount::new()
-    //     .keystore_path((".bundler_keystores".to_string()))
-    //     .pwd("bundler-test".to_string())
-    //     .load_chunkers(None)
-    //     .await?.chunkers.ok_or_eyre("Error: cannot load chunkers")?
-    //     .iter()
-    //     .map(|signer| {
-    //         let private_key_bytes = signer.to_bytes();
-    //                     format!("{}", hex::encode(private_key_bytes))
-    //     })
-    //     .collect();
-
-    // println!("{:?}", chunkers);
-
-    //     // for chunk in chunks {
-    //     //     let tags = vec![(Tag::new("chunk_index".to_string(), chunks_index.to_string()))];
-    //     //     let envelope = vec![Envelope::new().data(Some(chunk)).tags(Some(tags)).build()?];
-    //     //     let tx = create_bundle(envelope, private_key.clone(), ADDRESS_BABE2)
-    //     //         .await
-    //     //         .map_err(|_| Error::BundleNotCreated)?;
-    //     //     chunks_index += 1;
-    //     //     let chunk_hash = tx.tx_hash().to_string();
-    //     //     chunks_receipts.push(chunk_hash.clone().trim_start_matches("0x").to_string());
-    //     // }
-
-    // // Create a vector to store all the task handles with their original indices
-    // let chunker_count = chunkers.len();
-    // let total_chunks = chunks.len();
-
-    // // Create a vector to store all task handles
-    // let mut tasks = Vec::with_capacity(chunker_count);
-
-    // // Divide chunks among threads
-    // for chunker_idx in 0..chunker_count {
-    //     // Clone the chunker for this thread
-    //     let chunker = chunkers[chunker_idx].clone();
-
-    //     // Calculate which chunk indices this thread will handle
-    //     let chunk_indices: Vec<usize> = (0..total_chunks)
-    //         .filter(|i| i % chunker_count == chunker_idx)
-    //         .collect();
-
-    //     // Get the specific chunks this thread will process
-    //     let thread_chunks: Vec<(usize, Vec<u8>)> = chunk_indices
-    //         .into_iter()
-    //         .map(|i| (i, chunks[i].clone()))
-    //         .collect();
-
-    //     // Spawn the task
-    //     let task = tokio::spawn(async move {
-    //         let mut thread_results = Vec::with_capacity(thread_chunks.len());
-
-    //         for (original_index, chunk) in thread_chunks {
-    //             // Create tags with chunk index
-    //             let tags = vec![(Tag::new("chunk_index".to_string(), original_index.to_string()))];
-
-    //             // Create envelope
-    //             let envelope = vec![Envelope::new().data(Some(chunk)).tags(Some(tags)).build()?];
-
-    //             // Create bundle
-    //             let tx = create_bundle(envelope, chunker.clone(), ADDRESS_BABE2)
-    //                 .await
-    //                 .map_err(|_| Error::BundleNotCreated)?;
-
-    //             // Get chunk hash
-    //             let chunk_hash = tx.tx_hash().to_string();
-    //             let receipt = chunk_hash.trim_start_matches("0x").to_string();
-
-    //             // Store result with original index
-    //             thread_results.push((original_index, receipt));
-    //         }
-
-    //         Ok::<Vec<(usize, String)>, Error>(thread_results)
-    //     });
-
-    //     tasks.push(task);
-    // }
-
-    // Collect results from all tasks
-    // let mut all_indexed_receipts = Vec::with_capacity(total_chunks);
-    // for task in tasks {
-    //     // Handle any task join errors
-    //     let thread_results = task.await.map_err(|e| Error::Other(e.to_string()))?;
-    //     // Add this thread's results to the overall results
-    //     all_indexed_receipts.extend(thread_results?);
-    // }
-
-    // // Sort the results by the original index
-    // all_indexed_receipts.sort_by_key(|(idx, _)| *idx);
-
-    // // Extract just the receipts, now in the correct order
-    // let chunks_receipts = all_indexed_receipts.into_iter().map(|(_, receipt)| receipt).collect();
-
-    //     self.chunks_receipts = Some(chunks_receipts);
-
-    //     Ok(self)
-    // }
 
     pub async fn finalize(self) -> Result<String, Error> {
         let private_key: String = self.clone().private_key.ok_or(Error::PrivateKeyNeeded)?;
@@ -262,7 +160,7 @@ impl LargeBundle {
         ];
         let receipts_envelope = vec![Envelope::new().data(Some(data)).tags(Some(tags)).build()?];
 
-        let tx = create_bundle(receipts_envelope, private_key.clone(), ADDRESS_BABE2)
+        let tx = create_bundle(None, receipts_envelope, private_key.clone(), ADDRESS_BABE2)
             .await
             .map_err(|_| Error::BundleNotCreated)?;
 
@@ -320,7 +218,6 @@ impl LargeBundle {
             .clone()
             .into_iter()
             .map(|receipt| async move {
-                // println!("UNBUNDLING {}", receipt);
                 let receipt_bundle = Bundle::retrieve_envelopes(receipt.clone(), ADDRESS_BABE2)
                     .await
                     .map_err(|e| {
@@ -342,5 +239,169 @@ impl LargeBundle {
             .await
             .map_err(|e| Error::Other(e.to_string()))?;
         Ok(results.into_iter().flatten().collect::<Vec<u8>>())
+    }
+}
+
+// SuperAccount methods
+impl LargeBundle {
+    pub async fn super_finalize(self) -> Result<String, Error> {
+        let private_key: String = self.clone().private_key.ok_or(Error::PrivateKeyNeeded)?;
+        let chunks_receipts = self.chunks_receipts.ok_or(Error::EnvelopesNeeded)?;
+        let http_client = create_evm_http_client(WVM_RPC_URL)
+            .await
+            .map_err(|err| Error::Other(err.to_string()))?;
+
+        // Vec<String> -> stringified Vec<String> (String) -> &[u8]-> Vec<u8>
+        let data = serde_json::to_string(&chunks_receipts)
+            .map_err(|e| Error::Other(e.to_string()))?
+            .as_bytes()
+            .to_vec();
+
+        let tags: Vec<Tag> = vec![
+            Tag::new("Protocol".to_string(), "Large-Bundle".to_string()),
+            Tag::new(
+                "Chunks-Count".to_string(),
+                chunks_receipts.len().to_string(),
+            ),
+            Tag::new("Content-Type".to_string(), "application/json".to_string()),
+            Tag::new("Data-Content-Type".to_string(), self.content_type.unwrap()),
+        ];
+
+        let receipts_envelope = vec![Envelope::new().data(Some(data)).tags(Some(tags)).build()?];
+
+        let tx = create_bundle_sync(
+            Some(http_client),
+            receipts_envelope,
+            private_key,
+            ADDRESS_BABE2,
+        )
+        .await
+        .map_err(|e| Error::Other(format!("Final bundle creation failed: {}", e)))?;
+
+        Ok(tx.tx_hash().to_string())
+    }
+
+    pub async fn super_propagate_chunks(mut self) -> Result<Self, Error> {
+        let chunks = self.clone().chunks.ok_or(Error::EnvelopesNeeded)?;
+
+        let chunkers = SuperAccount::new()
+            .keystore_path(".bundler_keystores".to_string())
+            .pwd("test".to_string())
+            .load_chunkers(None) // Load all available chunkers
+            .await?
+            .chunkers
+            .ok_or(Error::EnvelopesNeeded)?;
+
+        let chunkers_count = chunkers.len();
+        println!(
+            "Processing {} chunks with {} chunkers",
+            chunks.len(),
+            chunkers_count
+        );
+        let mut chunks_receipts: Vec<Option<String>> = vec![None; chunks.len()];
+        let chunkers = Arc::new(chunkers);
+
+        let http_client = create_evm_http_client(WVM_RPC_URL)
+            .await
+            .map_err(|err| Error::Other(err.to_string()))?;
+        let max_concurrent = std::cmp::min(chunkers_count, 30); // Adjust based on system capacity
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(max_concurrent));
+        let (tx, mut rx) =
+            tokio::sync::mpsc::channel::<Result<(usize, String), Error>>(chunks.len());
+
+        for (chunk_index, chunk) in chunks.clone().into_iter().enumerate() {
+            let chunkers = Arc::clone(&chunkers);
+            let semaphore = Arc::clone(&semaphore);
+            let http_client = http_client.clone();
+            let tx = tx.clone();
+
+            tokio::spawn(async move {
+                let _permit = semaphore.acquire().await.unwrap();
+
+                // Determine which chunker to use (round-robin)
+                let chunker_index = chunk_index % chunkers_count;
+                let chunker = &chunkers[chunker_index];
+                let tags = vec![(Tag::new("chunk_index".to_string(), chunk_index.to_string()))];
+                let envelope = match Envelope::new().data(Some(chunk)).tags(Some(tags)).build() {
+                    Ok(env) => {
+                        vec![env]
+                    }
+                    Err(e) => {
+                        println!("Task {} failed to create envelope: {}", chunk_index, e);
+                        return;
+                    }
+                };
+
+                // multiple retry attempts for robustness
+                const MAX_RETRIES: usize = 3;
+                let mut last_error = None;
+
+                for attempt in 1..=MAX_RETRIES {
+                    match create_bundle_sync(
+                        Some(http_client.clone()),
+                        envelope.clone(),
+                        chunker.to_bytes().to_string(),
+                        ADDRESS_BABE2,
+                    )
+                    .await
+                    {
+                        Ok(tx_result) => {
+                            let chunk_hash = tx_result
+                                .tx_hash()
+                                .to_string()
+                                .trim_start_matches("0x")
+                                .to_string();
+                            let _ = tx.send(Ok((chunk_index, chunk_hash))).await;
+                            return;
+                        }
+                        Err(e) if attempt < MAX_RETRIES => {
+                            last_error = Some(e);
+                            // Short backoff before retry
+                            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                        }
+                        Err(e) => {
+                            last_error = Some(e);
+                            break;
+                        }
+                    }
+                }
+
+                let error = last_error.unwrap_or(Error::Other(
+                    "All bundle creation attempts failed".to_string(),
+                ));
+                let _ = tx.send(Err(error)).await;
+            });
+        }
+
+        // drop the original sender so the channel can close when all tasks complete
+        drop(tx);
+
+        // process results as they arrive
+        let mut received_count = 0;
+
+        while let Some(result) = rx.recv().await {
+            match result {
+                Ok((index, hash)) => {
+                    chunks_receipts[index] = Some(hash);
+                    received_count += 1;
+                }
+                Err(e) => {
+                    println!("Error processing chunk: {}", e);
+                    return Err(e);
+                }
+            }
+        }
+
+        let chunks_receipts = chunks_receipts
+            .into_iter()
+            .enumerate()
+            .map(|(i, hash)| {
+                hash.ok_or_else(|| Error::Other(format!("Missing receipt for chunk {}", i)))
+            })
+            .collect::<Result<Vec<String>, Error>>()?;
+
+        self.chunks_receipts = Some(chunks_receipts);
+
+        Ok(self)
     }
 }

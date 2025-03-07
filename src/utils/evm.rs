@@ -3,8 +3,7 @@ use crate::utils::core::bundle_tx_metadata::BundleTxMetadata;
 use crate::utils::core::envelope::Envelope;
 use crate::utils::core::tx_envelope_writer::TxEnvelopeWrapper;
 use crate::utils::errors::Error;
-use alloy::network::TxSigner;
-use alloy::{network::NetworkWallet, signers::Signer};
+use alloy::signers::Signer;
 use {
     crate::utils::constants::{ADDRESS_BABE1, BLOCK_GAS_LIMIT, CHAIN_ID, WVM_RPC_URL},
     alloy::{
@@ -68,6 +67,75 @@ pub async fn create_envelope(
     }
 }
 
+// async fn broadcast_bundle(
+//     envelopes: Vec<u8>,
+//     provider: &RootProvider<Http<Client>>,
+//     private_key: Option<String>,
+//     version: &str,
+// ) -> Result<
+//     alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum>,
+//     Error,
+// > {
+//     if let Some(priv_key) = private_key {
+//         let signer: PrivateKeySigner = priv_key.parse()?;
+//         let wallet = EthereumWallet::from(signer.clone());
+
+//         let mut nonce = provider
+//             .get_transaction_count(signer.clone().address())
+//             .await?;
+//         let mut max_priority_fee_per_gas: u128 = 1_000_000_000;
+//         let mut max_fee_per_gas: u128 = 2_000_000_000;
+
+//         println!("Initial nonce: {:?}", nonce);
+
+//         let mut attempt = 0;
+
+//         loop {
+//             attempt += 1;
+//             println!("Broadcast attempt: {}", attempt);
+
+//             let tx = TransactionRequest::default()
+//                 .with_to(version.parse::<Address>()?)
+//                 .with_nonce(nonce)
+//                 .with_chain_id(CHAIN_ID)
+//                 .with_input(envelopes.clone())
+//                 .with_value(U256::from(0))
+//                 .with_gas_limit(490_000_000)
+//                 .with_max_priority_fee_per_gas(max_priority_fee_per_gas)
+//                 .with_max_fee_per_gas(max_fee_per_gas);
+
+//             let tx_envelope: alloy::consensus::TxEnvelope = tx.build(&wallet).await?;
+
+//             match provider.send_tx_envelope(tx_envelope.clone()).await {
+//                 Ok(tx) => {
+//                     println!("Transaction successfully broadcasted with nonce: {}", nonce);
+//                     return Ok(tx);
+//                 }
+//                 Err(e)
+//                     if e.to_string()
+//                         .contains("replacement transaction underpriced") =>
+//                 {
+//                     println!("Transaction underpriced, trying next nonce...");
+//                     nonce += 1; // increment nonce if underpriced
+
+//                     if max_fee_per_gas < BLOCK_GAS_LIMIT
+//                         && max_priority_fee_per_gas < BLOCK_GAS_LIMIT
+//                     {
+//                         max_priority_fee_per_gas *= 11 / 10; // 1.1 -> 10% increment
+//                         max_fee_per_gas *= 11 / 10; // same
+//                     }
+//                 }
+//                 Err(e) => {
+//                     eprintln!("Unexpected error: {:?}", e);
+//                     return Err(e.into());
+//                 }
+//             }
+//         }
+//     } else {
+//         Err(Error::PrivateKeyNeeded)
+//     }
+// }
+
 async fn broadcast_bundle(
     envelopes: Vec<u8>,
     provider: &RootProvider<Http<Client>>,
@@ -80,26 +148,26 @@ async fn broadcast_bundle(
     if let Some(priv_key) = private_key {
         let signer: PrivateKeySigner = priv_key.parse()?;
         let wallet = EthereumWallet::from(signer.clone());
+        let address = signer.address();
 
-        let mut nonce = provider
-            .get_transaction_count(signer.clone().address())
-            .await?;
+        let mut nonce = provider.get_transaction_count(address).await?;
+        let version_address = version.parse::<Address>()?;
         let mut max_priority_fee_per_gas: u128 = 1_000_000_000;
         let mut max_fee_per_gas: u128 = 2_000_000_000;
 
-        println!("Initial nonce: {:?}", nonce);
-
         let mut attempt = 0;
+
+        let envelopes_ref = &envelopes;
 
         loop {
             attempt += 1;
-            println!("Broadcast attempt: {}", attempt);
+            // println!("Broadcast attempt: {}", attempt);
 
             let tx = TransactionRequest::default()
-                .with_to(version.parse::<Address>()?)
+                .with_to(version_address)
                 .with_nonce(nonce)
                 .with_chain_id(CHAIN_ID)
-                .with_input(envelopes.clone())
+                .with_input(envelopes_ref.clone())
                 .with_value(U256::from(0))
                 .with_gas_limit(490_000_000)
                 .with_max_priority_fee_per_gas(max_priority_fee_per_gas)
@@ -107,7 +175,7 @@ async fn broadcast_bundle(
 
             let tx_envelope: alloy::consensus::TxEnvelope = tx.build(&wallet).await?;
 
-            match provider.send_tx_envelope(tx_envelope.clone()).await {
+            match provider.send_tx_envelope(tx_envelope).await {
                 Ok(tx) => {
                     println!("Transaction successfully broadcasted with nonce: {}", nonce);
                     return Ok(tx);
@@ -122,8 +190,8 @@ async fn broadcast_bundle(
                     if max_fee_per_gas < BLOCK_GAS_LIMIT
                         && max_priority_fee_per_gas < BLOCK_GAS_LIMIT
                     {
-                        max_priority_fee_per_gas *= 11 / 10; // 1.1 -> 10% increment
-                        max_fee_per_gas *= 11 / 10; // same
+                        max_priority_fee_per_gas *= 11 / 10;
+                        max_fee_per_gas *= 11 / 10;
                     }
                 }
                 Err(e) => {
@@ -138,6 +206,7 @@ async fn broadcast_bundle(
 }
 
 pub async fn create_bundle(
+    mut provider: Option<HttpClient>,
     envelope_inputs: Vec<Envelope>,
     private_key: String,
     version: &str,
@@ -145,11 +214,13 @@ pub async fn create_bundle(
     alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum>,
     Error,
 > {
-    let provider = create_evm_http_client(WVM_RPC_URL).await?;
-    let provider = std::sync::Arc::new(provider);
+    if provider.is_none() {
+        println!("PROVIDER NOT PROVIDED");
+        provider = Some(create_evm_http_client(WVM_RPC_URL).await?);
+    }
+    let provider = std::sync::Arc::new(provider.unwrap());
     let private_key = private_key.clone();
 
-    // Create vector of futures
     let futures: Vec<_> = envelope_inputs
         .into_iter()
         .enumerate()
@@ -167,7 +238,6 @@ pub async fn create_bundle(
         })
         .collect();
 
-    // Rest of the function remains the same
     let results = join_all(futures).await;
     let envelopes: Vec<TxEnvelopeWrapper> = results
         .into_iter()
@@ -274,7 +344,6 @@ pub async fn send_wvm(
     amount: u64,
 ) -> Result<String, Error> {
     let gas_price = U256::from(1_200_000_000);
-    // Convert ETH amount to Wei (1 ETH = 10^18 Wei)
     let amount_wei = U256::from(amount);
     let signer =
         LocalSigner::from_bytes(&sender_pk).map_err(|err| Error::Other(err.to_string()))?;
@@ -283,35 +352,82 @@ pub async fn send_wvm(
     let provider = ProviderBuilder::new().wallet(wallet).on_http(rpc_url);
     let nonce = provider.get_transaction_count(signer.address()).await?;
 
-    // let tx = TransactionRequest::default()
-    //     .with_to(address_to)
-    //     .with_value(amount_wei)
-
-    // // Send the transaction and wait for inclusion.
-    // let tx_hash = provider.send_transaction(tx).await?.watch().await.map_err(|err| Error::Other(err.to_string()))?;
-    // let txid = tx_hash.to_string();
-
-    // Build a transaction to send 100 wei from Alice to Bob.
-    // The `from` field is automatically filled to the first signer's address (Alice).
     let tx = TransactionRequest::default()
         .with_to(address_to)
-        // .with_nonce(0)
         .with_value(amount_wei)
-        .with_gas_price(20_000_000_000)
-        .with_gas_limit(21_000)
+        .with_gas_price(gas_price.try_into().unwrap())
+        .with_gas_limit(500_000)
         .with_nonce(nonce)
         .gas_limit(BLOCK_GAS_LIMIT.try_into().unwrap());
 
-    // Send the transaction and wait for the broadcast.
     let pending_tx = provider.send_transaction(tx).await?;
     let receipt = pending_tx
         .get_receipt()
         .await
         .map_err(|err| Error::Other(err.to_string()))?;
 
-    println!(
-        "Pending transaction... {}",
-        receipt.transaction_hash.to_string()
-    );
     Ok(receipt.transaction_hash.to_string())
+}
+
+pub async fn create_bundle_sync(
+    mut provider: Option<HttpClient>,
+    envelope_inputs: Vec<Envelope>,
+    private_key: String,
+    version: &str,
+) -> Result<
+    alloy::providers::PendingTransactionBuilder<Http<Client>, alloy::network::Ethereum>,
+    Error,
+> {
+    if provider.is_none() {
+        provider = Some(create_evm_http_client(WVM_RPC_URL).await?);
+    }
+    let provider = std::sync::Arc::new(provider.unwrap());
+    let mut envelopes = Vec::with_capacity(envelope_inputs.len());
+
+    for (i, input) in envelope_inputs.into_iter().enumerate() {
+        match create_envelope(Some(&private_key), input.clone()).await {
+            Ok(tx) => {
+                // println!("Created envelope {} in {:?}", i, elapsed);
+                envelopes.push(TxEnvelopeWrapper::from_envelope(tx, input));
+            }
+            Err(e) => {
+                println!("Failed to create envelope {}: {}", i, e);
+                return Err(e);
+            }
+        }
+    }
+
+    let bundle = BundleData::from(envelopes);
+    let serialized = TxEnvelopeWrapper::borsh_ser(&bundle);
+    let compressed = TxEnvelopeWrapper::brotli_compress_fast(&serialized);
+
+    const MAX_BROADCAST_RETRIES: usize = 3;
+    let mut last_error = None;
+
+    for attempt in 1..=MAX_BROADCAST_RETRIES {
+        println!("Broadcast attempt: {}", attempt);
+        match broadcast_bundle(
+            compressed.clone(),
+            &provider,
+            Some(private_key.clone()),
+            version,
+        )
+        .await
+        {
+            Ok(tx) => {
+                return Ok(tx);
+            }
+            Err(e) if attempt < MAX_BROADCAST_RETRIES => {
+                println!("Broadcast attempt {} failed: {}", attempt, e);
+                last_error = Some(e);
+            }
+            Err(e) => {
+                println!("Final broadcast attempt failed: {}", e);
+                last_error = Some(e);
+                break;
+            }
+        }
+    }
+
+    Err(last_error.unwrap_or(Error::Other("All broadcast attempts failed".to_string())))
 }

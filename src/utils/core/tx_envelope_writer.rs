@@ -142,6 +142,12 @@ impl TxEnvelopeWrapper {
         writer.into_inner()
     }
 
+    pub fn brotli_compress_fast(input: &[u8]) -> Vec<u8> {
+        let mut writer = brotli::CompressorWriter::new(Vec::new(), 65536, 1, 22);
+        writer.write_all(input).unwrap();
+        writer.into_inner()
+    }
+
     pub fn brotli_decompress(input: Vec<u8>) -> Vec<u8> {
         let mut decompressed_data = Vec::new();
         let mut decompressor = brotli::Decompressor::new(input.as_slice(), 32_768); // 32_768 -- 32 KiB
@@ -159,3 +165,25 @@ impl TxEnvelopeWrapper {
         res
     }
 }
+
+// // Split large data into smaller segments for parallel compression
+// pub async fn parallel_compress(data: &[u8]) -> Vec<u8> {
+//     const SEGMENT_SIZE: usize = 1_000_000; // 1MB segments
+//     let segments = data.chunks(SEGMENT_SIZE).collect::<Vec<_>>();
+
+//     let handles: Vec<_> = segments
+//         .into_iter()
+//         .map(|segment| {
+//             let segment = segment.to_vec();
+//             tokio::task::spawn_blocking(move || TxEnvelopeWrapper::brotli_compress(&segment))
+//         })
+//         .collect();
+
+//     let mut compressed = Vec::new();
+//     for handle in handles {
+//         let segment = handle.await.unwrap();
+//         compressed.extend_from_slice(&segment);
+//     }
+
+//     compressed
+// }
