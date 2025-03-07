@@ -163,6 +163,25 @@ graph LR
 
 A Large Bundle is a bundle under version 0xbabe2 that exceeds the WeaveVM L1 and `0xbabe1` transaction size limits, introducing incredibly high size efficiency to data settling on WeaveVM. For example, with [Alphanet v0.4.0](https://blog.wvm.dev/alphanet-v4) running @ 500 mgas/s, a Large Bundle has a max size of 246 GB. For the sake of DevX and simplicity of the current 0xbabe2 stack, Large Bundles in the Bundler SDK have been limited to 2GB, while on the network level, the size is 246GB.
 
+
+### SuperAccount
+A Super Account is a set of wallets created and stored as keystore wallets locally under your chosen directory. In Bundler terminology, each wallet is called a "chunker". Chunkers optimize the DevX of uploading LB chunks to WeaveVM by splitting each chunk to a chunker (~4MB per chunker), moving from a single-wallet single-threaded design in data uploads to a multi-wallet multi-threaded design.
+
+```rust
+use bundler::utils::core::super_account::SuperAccount;
+// init SuperAccount instance
+let super_account = SuperAccount::new()
+    .keystore_path(".bundler_keystores".to_string())
+    .pwd("weak-password".to_string()) // keystore pwd
+    .funder("private-key".to_string()) // the pk that will fund the chunkers
+    .build();
+// create chunkers
+let _chunkers = super_account.create_chunkers(Some(256)).await.unwrap(); // Some(amount) of chunkers
+// fund chunkers (1 tWVM each)
+let _fund = super_account.fund_chunkers().await.unwrap(); // will fund each chunker by 1 tWVM
+// retrieve chunkers
+let loaded_chunkers = super_account.load_chunkers(None).await.unwrap(); // None to load all chunkers
+```
 ### Architecture design
 
 Large Bundles are built on top of the Bundler data specification. In simple terms, a Large Bundle consists of `n` smaller chunks (standalone bundles) that are sequentially connected tail-to-head and then at the end the Large Bundle is a reference to all the sequentially related chunks, packing all of the chunks IDs in a single `0xbabe2` bundle and sending it to WeaveVM.
@@ -339,12 +358,12 @@ async fn send_bundle_without_target() -> eyre::Result<String> {
 
 ### 0xbabe2 Large Bundle
 
-#### Example: construct and disperse a Large Bundle
+#### Example: construct and disperse a Large Bundle single-threaded
 
 ```rust
 use crate::utils::core::large_bundle::LargeBundle;
 
-    async fn send_large_bundle() -> eyre::Result<String> {
+    async fn send_large_bundle_without_super_account() -> eyre::Result<String> {
         let private_key = String::from("");
         let content_type = "text/plain".to_string();
         let data = "~UwU~".repeat(4_000_000).as_bytes().to_vec();
@@ -361,6 +380,38 @@ use crate::utils::core::large_bundle::LargeBundle;
             .await?;
 
         Ok(large_bundle_hash)
+    }
+```
+
+#### Example: construct and disperse a Large Bundle multi-threaded
+
+```rust
+    async fn send_large_bundle_with_super_account() {
+        // will fail until a tWVM funded EOA (pk) is provided, take care about nonce if same wallet is used as in test_send_bundle_with_target
+        let private_key =
+            String::from("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b");
+        let content_type = "text/plain".to_string();
+        let data = "~UwU~".repeat(8_000_000).as_bytes().to_vec();
+        let super_account = SuperAccount::new()
+            .keystore_path(".bundler_keystores".to_string())
+            .pwd("test".to_string());
+
+        let large_bundle = LargeBundle::new()
+            .data(data)
+            .private_key(private_key)
+            .content_type(content_type)
+            .super_account(super_account)
+            .chunk()
+            .build()
+            .unwrap()
+            .super_propagate_chunks()
+            .await
+            .unwrap()
+            .finalize()
+            .await
+            .unwrap();
+
+        println!("{:?}", large_bundle);
     }
 ```
 
