@@ -24,6 +24,7 @@ pub struct LargeBundle {
     pub chunks: Option<Vec<Vec<u8>>>,
     pub chunks_receipts: Option<Vec<String>>,
     pub content_type: Option<String>,
+    pub super_account: Option<SuperAccount>,
 }
 
 impl LargeBundle {
@@ -35,6 +36,7 @@ impl LargeBundle {
             chunks: None,
             chunks_receipts: None,
             content_type: None,
+            super_account: None,
         }
     }
 
@@ -55,6 +57,11 @@ impl LargeBundle {
 
     pub fn content_type(mut self, content_type: String) -> Self {
         self.content_type = Some(content_type);
+        self
+    }
+
+    pub fn super_account(mut self, account: SuperAccount) -> Self {
+        self.super_account = Some(account);
         self
     }
 
@@ -114,6 +121,7 @@ impl LargeBundle {
             content_type: Some(content_type),
             chunks_receipts: self.chunks_receipts,
             owner_sig: self.owner_sig,
+            super_account: self.super_account,
         };
 
         Ok(res)
@@ -144,11 +152,16 @@ impl LargeBundle {
     pub async fn finalize(self) -> Result<String, Error> {
         let private_key: String = self.clone().private_key.ok_or(Error::PrivateKeyNeeded)?;
         let chunks_receipts = self.chunks_receipts.ok_or(Error::EnvelopesNeeded)?;
+        let http_client = create_evm_http_client(WVM_RPC_URL)
+            .await
+            .map_err(|err| Error::Other(err.to_string()))?;
+
         // Vec<String> -> stringified Vec<String> (String) -> &[u8]-> Vec<u8>
         let data = serde_json::to_string(&chunks_receipts)
             .map_err(|e| Error::Other(e.to_string()))?
             .as_bytes()
             .to_vec();
+
         let tags: Vec<Tag> = vec![
             Tag::new("Protocol".to_string(), "Large-Bundle".to_string()),
             Tag::new(
@@ -158,11 +171,17 @@ impl LargeBundle {
             Tag::new("Content-Type".to_string(), "application/json".to_string()),
             Tag::new("Data-Content-Type".to_string(), self.content_type.unwrap()),
         ];
+
         let receipts_envelope = vec![Envelope::new().data(Some(data)).tags(Some(tags)).build()?];
 
-        let tx = create_bundle(None, receipts_envelope, private_key.clone(), ADDRESS_BABE2)
-            .await
-            .map_err(|_| Error::BundleNotCreated)?;
+        let tx = create_bundle_sync(
+            Some(http_client),
+            receipts_envelope,
+            private_key,
+            ADDRESS_BABE2,
+        )
+        .await
+        .map_err(|e| Error::Other(format!("Final bundle creation failed: {}", e)))?;
 
         Ok(tx.tx_hash().to_string())
     }
@@ -242,51 +261,13 @@ impl LargeBundle {
     }
 }
 
-// SuperAccount methods
+// SuperAccount method
 impl LargeBundle {
-    pub async fn super_finalize(self) -> Result<String, Error> {
-        let private_key: String = self.clone().private_key.ok_or(Error::PrivateKeyNeeded)?;
-        let chunks_receipts = self.chunks_receipts.ok_or(Error::EnvelopesNeeded)?;
-        let http_client = create_evm_http_client(WVM_RPC_URL)
-            .await
-            .map_err(|err| Error::Other(err.to_string()))?;
-
-        // Vec<String> -> stringified Vec<String> (String) -> &[u8]-> Vec<u8>
-        let data = serde_json::to_string(&chunks_receipts)
-            .map_err(|e| Error::Other(e.to_string()))?
-            .as_bytes()
-            .to_vec();
-
-        let tags: Vec<Tag> = vec![
-            Tag::new("Protocol".to_string(), "Large-Bundle".to_string()),
-            Tag::new(
-                "Chunks-Count".to_string(),
-                chunks_receipts.len().to_string(),
-            ),
-            Tag::new("Content-Type".to_string(), "application/json".to_string()),
-            Tag::new("Data-Content-Type".to_string(), self.content_type.unwrap()),
-        ];
-
-        let receipts_envelope = vec![Envelope::new().data(Some(data)).tags(Some(tags)).build()?];
-
-        let tx = create_bundle_sync(
-            Some(http_client),
-            receipts_envelope,
-            private_key,
-            ADDRESS_BABE2,
-        )
-        .await
-        .map_err(|e| Error::Other(format!("Final bundle creation failed: {}", e)))?;
-
-        Ok(tx.tx_hash().to_string())
-    }
-
     pub async fn super_propagate_chunks(mut self) -> Result<Self, Error> {
         let chunks = self.clone().chunks.ok_or(Error::EnvelopesNeeded)?;
+        let super_account = self.clone().super_account.ok_or(Error::PrivateKeyNeeded)?;
 
-        let chunkers = SuperAccount::new()
-            .keystore_path(".bundler_keystores".to_string())
-            .pwd("test".to_string())
+        let chunkers = super_account
             .load_chunkers(None) // Load all available chunkers
             .await?
             .chunkers
@@ -304,7 +285,7 @@ impl LargeBundle {
         let http_client = create_evm_http_client(WVM_RPC_URL)
             .await
             .map_err(|err| Error::Other(err.to_string()))?;
-        let max_concurrent = std::cmp::min(chunkers_count, 30); // Adjust based on system capacity
+        let max_concurrent = std::cmp::min(chunkers_count, 30);
         let semaphore = Arc::new(tokio::sync::Semaphore::new(max_concurrent));
         let (tx, mut rx) =
             tokio::sync::mpsc::channel::<Result<(usize, String), Error>>(chunks.len());

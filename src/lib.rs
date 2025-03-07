@@ -3,15 +3,13 @@ pub mod utils;
 #[cfg(test)]
 mod tests {
 
-    use crate::utils::constants::{ADDRESS_BABE1, ADDRESS_BABE2};
+    use crate::utils::constants::ADDRESS_BABE1;
     use crate::utils::core::bundle::Bundle;
     use crate::utils::core::envelope::Envelope;
     use crate::utils::core::large_bundle::LargeBundle;
+    use crate::utils::core::super_account::SuperAccount;
     use crate::utils::core::tags::Tag;
     use crate::utils::evm::{generate_random_bytes, generate_random_calldata};
-    use std::fs::File;
-    use std::io::{self, Read};
-    use std::path::Path;
 
     #[tokio::test]
     async fn test_bundle_retrieval() {
@@ -139,42 +137,62 @@ mod tests {
         assert_eq!(bundle_tx.len(), 66);
     }
 
-    // #[tokio::test]
-    // async fn test_send_large_bundle() {
+    #[tokio::test]
+    async fn test_send_large_bundle_without_super_account() {
+        // will fail until a tWVM funded EOA (pk) is provided, take care about nonce if same wallet is used as in test_send_bundle_with_target
+        let private_key =
+            String::from("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b");
+        let content_type = "text/plain".to_string();
+        let data = "~UwU~".repeat(4_000_000).as_bytes().to_vec();
+        let large_bundle = LargeBundle::new()
+            .data(data)
+            .private_key(private_key)
+            .content_type(content_type)
+            .chunk()
+            .build()
+            .unwrap()
+            .propagate_chunks()
+            .await
+            .unwrap()
+            .finalize()
+            .await
+            .unwrap();
 
-    //     // will fail until a tWVM funded EOA (pk) is provided, take care about nonce if same wallet is used as in test_send_bundle_with_target
-    //     let private_key =
-    //         String::from("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b");
+        println!("{:?}", large_bundle);
 
-    //     let file_path = "./large.mp4";
+        assert_eq!(large_bundle.len(), 66);
+    }
 
-    //     let content_type = "video/mp4".to_string();
-    //     // let content_type = "text/plain".to_string();
+    #[tokio::test]
+    async fn test_send_large_bundle_with_super_account() {
+        // will fail until a tWVM funded EOA (pk) is provided, take care about nonce if same wallet is used as in test_send_bundle_with_target
+        let private_key =
+            String::from("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b");
+        let content_type = "text/plain".to_string();
+        let data = "~UwU~".repeat(8_000_000).as_bytes().to_vec();
+        let super_account = SuperAccount::new()
+            .keystore_path(".bundler_keystores".to_string())
+            .pwd("test".to_string());
 
-    //     let mut file = File::open(file_path).unwrap();
-    //     let mut bytes = Vec::new();
-    //     file.read_to_end(&mut bytes).unwrap();
-    //     let data = "w".repeat(8_000_000).as_bytes().to_vec();
+        let large_bundle = LargeBundle::new()
+            .data(data)
+            .private_key(private_key)
+            .content_type(content_type)
+            .super_account(super_account)
+            .chunk()
+            .build()
+            .unwrap()
+            .super_propagate_chunks()
+            .await
+            .unwrap()
+            .finalize()
+            .await
+            .unwrap();
 
-    //     // let random_data: Vec<u8> = generate_random_bytes(1 * 8_388_608); // 104MB
-    //     let large_bundle = LargeBundle::new()
-    //         .data(bytes)
-    //         .private_key(private_key)
-    //         .content_type(content_type)
-    //         .chunk()
-    //         .build()
-    //         .unwrap()
-    //         .super_propagate_chunks()
-    //         .await
-    //         .unwrap()
-    //         .super_finalize()
-    //         .await
-    //         .unwrap();
+        println!("{:?}", large_bundle);
 
-    //     println!("{:?}", large_bundle);
-
-    //     assert_eq!(large_bundle.len(), 66);
-    // }
+        assert_eq!(large_bundle.len(), 66);
+    }
 
     #[tokio::test]
     async fn test_retrieve_large_bundle() {
