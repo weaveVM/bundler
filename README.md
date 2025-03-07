@@ -161,7 +161,7 @@ graph LR
 
 ### About
 
-A Large Bundle is a bundle under version 0xbabe2 that exceeds the WeaveVM L1 and `0xbabe1` transaction size limits, introducing incredibly high size efficiency to data settling on WeaveVM. For example, with [Alphanet v0.4.0](https://blog.wvm.dev/alphanet-v4) running @ 500 mgas/s, a Large Bundle has a max size of 246 GB. For the sake of DevX and simplicity of the current 0xbabe2 stack, Large Bundles in the Bundler SDK have been limited to 1GB, while on the network level, the size is 246GB.
+A Large Bundle is a bundle under version 0xbabe2 that exceeds the WeaveVM L1 and `0xbabe1` transaction size limits, introducing incredibly high size efficiency to data settling on WeaveVM. For example, with [Alphanet v0.4.0](https://blog.wvm.dev/alphanet-v4) running @ 500 mgas/s, a Large Bundle has a max size of 246 GB. For the sake of DevX and simplicity of the current 0xbabe2 stack, Large Bundles in the Bundler SDK have been limited to 2GB, while on the network level, the size is 246GB.
 
 ### Architecture design
 
@@ -187,7 +187,7 @@ graph TD
     Bundler --> |Creates Large Bundle with all chunk IDs| RefBundle[Large Bundle - 0xbabe2]
     RefBundle --> |Submit to| WeaveVML1
     
-    subgraph "Large Bundle Transactions Flow (Up to 246GB on network, 1GB in SDK (current))"
+    subgraph "Large Bundle Transactions Flow (Up to 246GB on network, 2GB in SDK (current))"
         Chunk1
         Chunk2
         Chunk3
