@@ -163,8 +163,27 @@ graph LR
 
 ### About
 
-A Large Bundle is a bundle under version 0xbabe2 that exceeds the WeaveVM L1 and `0xbabe1` transaction size limits, introducing incredibly high size efficiency to data settling on WeaveVM. For example, with [Alphanet v0.4.0](https://blog.wvm.dev/alphanet-v4) running @ 500 mgas/s, a Large Bundle has a max size of 246 GB. For the sake of DevX and simplicity of the current 0xbabe2 stack, Large Bundles in the Bundler SDK have been limited to 1GB, while on the network level, the size is 246GB.
+A Large Bundle is a bundle under version 0xbabe2 that exceeds the WeaveVM L1 and `0xbabe1` transaction size limits, introducing incredibly high size efficiency to data settling on WeaveVM. For example, with [Alphanet v0.4.0](https://blog.wvm.dev/alphanet-v4) running @ 500 mgas/s, a Large Bundle has a max size of 246 GB. For the sake of DevX and simplicity of the current 0xbabe2 stack, Large Bundles in the Bundler SDK have been limited to 2GB, while on the network level, the size is 246GB.
 
+
+### SuperAccount
+A Super Account is a set of wallets created and stored as keystore wallets locally under your chosen directory. In Bundler terminology, each wallet is called a "chunker". Chunkers optimize the DevX of uploading LB chunks to WeaveVM by splitting each chunk to a chunker (~4MB per chunker), moving from a single-wallet single-threaded design in data uploads to a multi-wallet multi-threaded design.
+
+```rust
+use bundler::utils::core::super_account::SuperAccount;
+// init SuperAccount instance
+let super_account = SuperAccount::new()
+    .keystore_path(".bundler_keystores".to_string())
+    .pwd("weak-password".to_string()) // keystore pwd
+    .funder("private-key".to_string()) // the pk that will fund the chunkers
+    .build();
+// create chunkers
+let _chunkers = super_account.create_chunkers(Some(256)).await.unwrap(); // Some(amount) of chunkers
+// fund chunkers (1 tWVM each)
+let _fund = super_account.fund_chunkers().await.unwrap(); // will fund each chunker by 1 tWVM
+// retrieve chunkers
+let loaded_chunkers = super_account.load_chunkers(None).await.unwrap(); // None to load all chunkers
+```
 ### Architecture design
 
 Large Bundles are built on top of the Bundler data specification. In simple terms, a Large Bundle consists of `n` smaller chunks (standalone bundles) that are sequentially connected tail-to-head and then at the end the Large Bundle is a reference to all the sequentially related chunks, packing all of the chunks IDs in a single `0xbabe2` bundle and sending it to WeaveVM.
@@ -189,7 +208,7 @@ graph TD
     Bundler --> |Creates Large Bundle with all chunk IDs| RefBundle[Large Bundle - 0xbabe2]
     RefBundle --> |Submit to| WeaveVML1
     
-    subgraph "Large Bundle Transactions Flow (Up to 246GB on network, 1GB in SDK (current))"
+    subgraph "Large Bundle Transactions Flow (Up to 246GB on network, 2GB in SDK (current))"
         Chunk1
         Chunk2
         Chunk3
@@ -341,12 +360,12 @@ async fn send_bundle_without_target() -> eyre::Result<String> {
 
 ### 0xbabe2 Large Bundle
 
-#### Example: construct and disperse a Large Bundle
+#### Example: construct and disperse a Large Bundle single-threaded
 
 ```rust
 use crate::utils::core::large_bundle::LargeBundle;
 
-    async fn send_large_bundle() -> eyre::Result<String> {
+    async fn send_large_bundle_without_super_account() -> eyre::Result<String> {
         let private_key = String::from("");
         let content_type = "text/plain".to_string();
         let data = "~UwU~".repeat(4_000_000).as_bytes().to_vec();
@@ -363,6 +382,38 @@ use crate::utils::core::large_bundle::LargeBundle;
             .await?;
 
         Ok(large_bundle_hash)
+    }
+```
+
+#### Example: construct and disperse a Large Bundle multi-threaded
+
+```rust
+    async fn send_large_bundle_with_super_account() {
+        // will fail until a tWVM funded EOA (pk) is provided, take care about nonce if same wallet is used as in test_send_bundle_with_target
+        let private_key =
+            String::from("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b");
+        let content_type = "text/plain".to_string();
+        let data = "~UwU~".repeat(8_000_000).as_bytes().to_vec();
+        let super_account = SuperAccount::new()
+            .keystore_path(".bundler_keystores".to_string())
+            .pwd("test".to_string());
+
+        let large_bundle = LargeBundle::new()
+            .data(data)
+            .private_key(private_key)
+            .content_type(content_type)
+            .super_account(super_account)
+            .chunk()
+            .build()
+            .unwrap()
+            .super_propagate_chunks()
+            .await
+            .unwrap()
+            .finalize()
+            .await
+            .unwrap();
+
+        println!("{:?}", large_bundle);
     }
 ```
 
@@ -415,6 +466,9 @@ GET /v2/resolve/:large_bundle_txid
 ## Cost Efficiency: some comparisons
 
 ### SSTORE2 VS WeaveVM L1 calldata
+<details>
+<summary>View comparison table</summary>
+
 In the comparison below, we tested data settling of 1MB of non-zero bytes. WeaveVM's pricing of non-zero bytes (8 gas) and large transaction data size limit (8MB) allows us to fit the whole MB in a single transaction, paying a single overhead fee.
 
 | Chain | File Size (bytes) | Number of Contracts/Tx | Gas Used | Gas Price (Gwei) | Cost in Native | Native Price (USD) | Total (USD) |
@@ -433,8 +487,12 @@ In the comparison below, we tested data settling of 1MB of non-zero bytes. Weave
 | Moonbeam (Polkadot) | 1,000,000 | 41 | 202,835,200 gas (+NaN L1 gas) | 100 Gwei | 20.283520 | $0.27 | $5.40 |
 | Polygon zkEVM (ZK L2) | 1,000,000 | 41 | 202,835,200 gas (+12,000,000 L1 gas) | 0.05 Gwei (L1: 20 Gwei) | 0.010142 (+0.072095 L1 fee) | $3641.98 | $299.50 |
 | Solana L1 | 1,000,000 | 98 | 490,000 imports | N/A | 0.000495 (0.000005 deposit) | $217.67 | $0.11 |
+</details>
 
 ### SSTORE2 VS WeaveVM L1 Calldata VS WeaveVM Bundler
+<details>
+<summary>View comparison table</summary>
+
 Now let's take the data even higher, but for simplicity, let's not fit the whole data in a single WeaveVM L1 calldata transaction. Instead, we'll split it into 1MB transactions (creating multiple data settlement overhead fees): 5MB, 5 txs of 1 MB each:
 
 | Chain | File Size (bytes) | Number of Contracts/Tx | Gas Used | Gas Price (Gwei) | Cost in Native | Native Price (USD) | Total (USD) |
@@ -454,8 +512,11 @@ Now let's take the data even higher, but for simplicity, let's not fit the whole
 | Moonbeam (Polkadot) | 5,000,000 | 204 | 1,009,228,800 gas (+NaN L1 gas) | 100 Gwei | 100.922880 | $0.27 | $26.94 |
 | Polygon zkEVM (ZK L2) | 5,000,000 | 204 | 1,009,228,800 gas (+60,000,000 L1 gas) | 0.05 Gwei (L1: 20 Gwei) | 0.050461 (+0.360470 L1 fee) | $3650.62 | $1500.16 |
 | Solana L1 | 5,000,000 | 489 tx | 2445.00k imports | N/A | 0.002468 (0.000023 deposit) | $218.44 | $0.54 |
+</details>
 
 ### WeaveVM L1 Calldata VS WeaveVM Bundler
+<details>
+<summary>View comparison table</summary>
 
 Let's compare storing 40 MB of data (40 x 1 MB transactions) using two different methods, considering the 8 MB bundle size limit:
 
@@ -470,8 +531,7 @@ Let's compare storing 40 MB of data (40 x 1 MB transactions) using two different
 | Gas Price | 1 Gwei | 1 Gwei |
 | Total Cost | ~$1.5-1.7 | ~$1.3 |
 | Cost Savings | - | ~15% cheaper |
-
-The key advantage of Bundler comes from reducing the number of base fee payments from 40 (in L1 calldata) to just 5 bundles, with each bundle containing 8 transactions, resulting in approximately 15% cost savings.
+</details>
 
 ### Table data sources
 * [WeaveVM calculator](https://www.wvm.dev/calculator)
