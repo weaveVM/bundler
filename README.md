@@ -208,7 +208,7 @@ graph TD
     Bundler --> |Creates Large Bundle with all chunk IDs| RefBundle[Large Bundle - 0xbabe2]
     RefBundle --> |Submit to| WeaveVML1
     
-    ChunkN --> |References| RefBundle
+    ChunkN --> |Chunks Receipts| RefBundle
     
     subgraph "Large Bundle Transactions Flow (Up to 246GB on network, 2GB in SDK (current))"
         Chunk1
