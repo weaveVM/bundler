@@ -208,6 +208,8 @@ graph TD
     Bundler --> |Creates Large Bundle with all chunk IDs| RefBundle[Large Bundle - 0xbabe2]
     RefBundle --> |Submit to| WeaveVML1
     
+    ChunkN --> |References| RefBundle
+    
     subgraph "Large Bundle Transactions Flow (Up to 246GB on network, 2GB in SDK (current))"
         Chunk1
         Chunk2
@@ -363,7 +365,7 @@ async fn send_bundle_without_target() -> eyre::Result<String> {
 #### Example: construct and disperse a Large Bundle single-threaded
 
 ```rust
-use crate::utils::core::large_bundle::LargeBundle;
+use bundler::utils::core::large_bundle::LargeBundle;
 
     async fn send_large_bundle_without_super_account() -> eyre::Result<String> {
         let private_key = String::from("");
