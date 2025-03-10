@@ -398,11 +398,14 @@ use bundler::utils::core::large_bundle::LargeBundle;
             .keystore_path(".bundler_keystores".to_string())
             .pwd("test".to_string());
 
+        let chunkers_count = Some(10u32); // pass None to pass all chunkers
+
         let large_bundle = LargeBundle::new()
             .data(data)
             .private_key(private_key)
             .content_type(content_type)
             .super_account(super_account)
+            .with_chunkers_count(chunkers_count)
             .chunk()
             .build()
             .unwrap()

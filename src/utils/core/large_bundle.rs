@@ -25,6 +25,7 @@ pub struct LargeBundle {
     pub chunks_receipts: Option<Vec<String>>,
     pub content_type: Option<String>,
     pub super_account: Option<SuperAccount>,
+    pub chunkers_count: Option<u32>,
 }
 
 impl LargeBundle {
@@ -37,6 +38,7 @@ impl LargeBundle {
             chunks_receipts: None,
             content_type: None,
             super_account: None,
+            chunkers_count: None,
         }
     }
 
@@ -62,6 +64,11 @@ impl LargeBundle {
 
     pub fn super_account(mut self, account: SuperAccount) -> Self {
         self.super_account = Some(account);
+        self
+    }
+
+    pub fn with_chunkers_count(mut self, count: u32) -> Self {
+        self.chunkers_count = Some(count);
         self
     }
 
@@ -122,6 +129,7 @@ impl LargeBundle {
             chunks_receipts: self.chunks_receipts,
             owner_sig: self.owner_sig,
             super_account: self.super_account,
+            chunkers_count: self.chunkers_count,
         };
 
         Ok(res)
@@ -266,9 +274,10 @@ impl LargeBundle {
     pub async fn super_propagate_chunks(mut self) -> Result<Self, Error> {
         let chunks = self.clone().chunks.ok_or(Error::EnvelopesNeeded)?;
         let super_account = self.clone().super_account.ok_or(Error::PrivateKeyNeeded)?;
+        let chunkers_count = self.clone().chunkers_count;
 
         let chunkers = super_account
-            .load_chunkers(None) // Load all available chunkers
+            .load_chunkers(chunkers_count) // Load all available chunkers
             .await?
             .chunkers
             .ok_or(Error::EnvelopesNeeded)?;
