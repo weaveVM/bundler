@@ -19,6 +19,14 @@ pub enum Error {
     UnverifiedAddress,
     #[error("Bundle could not be created")]
     BundleNotCreated,
+    #[error("Error reconstructing the Large Bundle")]
+    LargeBundleReconstruction,
+    #[error("Error retrieving envelope receipts of the Large Bundle")]
+    LargeBundleChunksRetrieval,
+    #[error("Large Bundle missing SuperAccount instance")]
+    SuperAccountNeeded,
+    #[error("SuperAccount instance missing chunkers")]
+    ChunkersNeeded,
     #[error("Other")]
     Other(String),
     #[error("Error parsing private key")]
