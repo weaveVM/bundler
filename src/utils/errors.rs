@@ -7,6 +7,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
+    #[error("Invalid Keystore Path or Password")]
+    InvalidKeystore,
     #[error("Bundle must have envelopes")]
     EnvelopesNeeded,
     #[error("Bundle or envelope must have a private key")]
@@ -17,6 +19,14 @@ pub enum Error {
     UnverifiedAddress,
     #[error("Bundle could not be created")]
     BundleNotCreated,
+    #[error("Error reconstructing the Large Bundle")]
+    LargeBundleReconstruction,
+    #[error("Error retrieving envelope receipts of the Large Bundle")]
+    LargeBundleChunksRetrieval,
+    #[error("Large Bundle missing SuperAccount instance")]
+    SuperAccountNeeded,
+    #[error("SuperAccount instance missing chunkers")]
+    ChunkersNeeded,
     #[error("Other")]
     Other(String),
     #[error("Error parsing private key")]

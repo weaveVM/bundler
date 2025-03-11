@@ -12,7 +12,6 @@ use crate::utils::evm::create_evm_http_client;
 use crate::utils::evm::{
     create_bundle, create_bundle_sync, retrieve_bundle_data, retrieve_bundle_tx,
 };
-use eyre::OptionExt;
 use futures::{self};
 use std::sync::Arc;
 
@@ -189,7 +188,7 @@ impl LargeBundle {
             ADDRESS_BABE2,
         )
         .await
-        .map_err(|e| Error::Other(format!("Final bundle creation failed: {}", e)))?;
+        .map_err(|_| Error::BundleNotCreated)?;
 
         Ok(tx.tx_hash().to_string())
     }
@@ -204,9 +203,10 @@ impl LargeBundle {
         }
 
         let large_bundle = retrieve_bundle_data(bundle.calldata).await;
-        let chunks_receipts = large_bundle.envelopes.get(0).ok_or_eyre(Error::Other(
-            "Error: cannot reconstruct Large Envelope".to_string(),
-        ))?;
+        let chunks_receipts = large_bundle
+            .envelopes
+            .get(0)
+            .ok_or_else(|| Error::LargeBundleChunksRetrieval)?;
 
         // retrieve Large Bundle Data-Content-Type
         let data_content_type = chunks_receipts
@@ -239,7 +239,9 @@ impl LargeBundle {
     }
 
     pub async fn reconstruct_large_bundle(self) -> Result<Vec<u8>, Error> {
-        let chunks_receipts = self.chunks_receipts.ok_or_else(|| Error::EnvelopesNeeded)?;
+        let chunks_receipts = self
+            .chunks_receipts
+            .ok_or_else(|| Error::LargeBundleChunksRetrieval)?;
 
         let receipt_futures = chunks_receipts
             .clone()
@@ -247,12 +249,7 @@ impl LargeBundle {
             .map(|receipt| async move {
                 let receipt_bundle = Bundle::retrieve_envelopes(receipt.clone(), ADDRESS_BABE2)
                     .await
-                    .map_err(|e| {
-                        Error::Other(format!(
-                            "Failed to retrieve bundle for receipt {}: {}",
-                            receipt, e
-                        ))
-                    })?;
+                    .map_err(|_| Error::LargeBundleReconstruction)?;
                 let receipt_writer = receipt_bundle
                     .envelopes
                     .get(0)
@@ -272,15 +269,21 @@ impl LargeBundle {
 // SuperAccount method
 impl LargeBundle {
     pub async fn super_propagate_chunks(mut self) -> Result<Self, Error> {
-        let chunks = self.clone().chunks.ok_or(Error::EnvelopesNeeded)?;
-        let super_account = self.clone().super_account.ok_or(Error::PrivateKeyNeeded)?;
+        let chunks = self
+            .clone()
+            .chunks
+            .ok_or(Error::LargeBundleChunksRetrieval)?;
+        let super_account = self
+            .clone()
+            .super_account
+            .ok_or(Error::SuperAccountNeeded)?;
         let chunkers_count = self.clone().chunkers_count;
 
         let chunkers = super_account
             .load_chunkers(chunkers_count) // Load all available chunkers
             .await?
             .chunkers
-            .ok_or(Error::EnvelopesNeeded)?;
+            .ok_or(Error::ChunkersNeeded)?;
 
         let chunkers_count = chunkers.len();
         println!(
@@ -356,9 +359,7 @@ impl LargeBundle {
                     }
                 }
 
-                let error = last_error.unwrap_or(Error::Other(
-                    "All bundle creation attempts failed".to_string(),
-                ));
+                let error = last_error.unwrap_or(Error::BundleNotCreated);
                 let _ = tx.send(Err(error)).await;
             });
         }
