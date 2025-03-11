@@ -7,6 +7,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
+    #[error("Invalid Keystore Path or Password")]
+    InvalidKeystore,
     #[error("Bundle must have envelopes")]
     EnvelopesNeeded,
     #[error("Bundle or envelope must have a private key")]

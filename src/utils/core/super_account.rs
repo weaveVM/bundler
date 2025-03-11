@@ -54,10 +54,7 @@ impl SuperAccount {
             .chunkers
             .clone()
             .ok_or_eyre("Error: chunkers not found")?;
-        let funder = self.funder.ok_or_eyre("Error: funder not provided")?;
-        // let http_client = create_evm_http_client(WVM_RPC_URL)
-        //     .await
-        //     .map_err(|err| Error::Other(err.to_string()))?;
+        let funder = self.funder.ok_or_else(|| Error::PrivateKeyNeeded)?;
 
         for chunker in chunkers {
             send_wvm(funder, chunker.address(), SAFE_CHUNK_TOPUP).await?;
@@ -70,11 +67,11 @@ impl SuperAccount {
         let path = self
             .clone()
             .keystore_path
-            .ok_or_eyre("Error: keystore path not provided")?;
+            .ok_or_else(|| Error::InvalidKeystore)?;
         let pwd = self
             .clone()
             .keystore_pwd
-            .ok_or_eyre("Error: keystore pwd not provided")?;
+            .ok_or_else(|| Error::InvalidKeystore)?;
 
         let keystore_dir = Path::new(&path);
         std::fs::create_dir_all(keystore_dir).map_err(|err| Error::Other(err.to_string()))?;
@@ -125,11 +122,11 @@ impl SuperAccount {
         let path = self
             .clone()
             .keystore_path
-            .ok_or_eyre("Error: keystore path not provided")?;
+            .ok_or_else(|| Error::InvalidKeystore)?;
         let pwd = self
             .clone()
             .keystore_pwd
-            .ok_or_eyre("Error: keystore pwd not provided")?;
+            .ok_or_else(|| Error::InvalidKeystore)?;
 
         let keystore_dir = Path::new(&path);
         let mut count = fs::read_dir(keystore_dir)
