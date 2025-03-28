@@ -15,20 +15,20 @@ async fn main() -> shuttle_axum::ShuttleAxum {
     let router = Router::new()
         .route("/", get(get_greet))
         // v1 routes
-        .route("/v1/envelopes/:bundle_txid", get(get_envelopes_of))
-        .route("/v1/envelopes/ids/:bundle_txid", get(get_envelopes_id_of))
+        .route("/v1/envelopes/{bundle_txid}", get(get_envelopes_of))
+        .route("/v1/envelopes/ids/{bundle_txid}", get(get_envelopes_id_of))
         .route(
-            "/v1/envelopes-full/:bundle_txid",
+            "/v1/envelopes-full/{bundle_txid}",
             get(get_envelopes_of_full),
         )
         // v2 routes
-        .route("/v2/envelopes/:bundle_txid", get(get_envelopes_of_2))
-        .route("/v2/envelopes/ids/:bundle_txid", get(get_envelopes_id_of_2))
+        .route("/v2/envelopes/{bundle_txid}", get(get_envelopes_of_2))
+        .route("/v2/envelopes/ids/{bundle_txid}", get(get_envelopes_id_of_2))
         .route(
-            "/v2/envelopes-full/:bundle_txid",
+            "/v2/envelopes-full/{bundle_txid}",
             get(get_envelopes_of_full_2),
         )
-        .route("/v2/resolve/:large_bundle_txid", get(resolve_large_bundle))
+        .route("/v2/resolve/{large_bundle_txid}", get(resolve_large_bundle))
         .layer(timeout_layer);
 
     Ok(router.into())

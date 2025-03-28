@@ -25,9 +25,9 @@ serde = "1.0.216"
 serde_json = "1.0.134"
 tokio = {version = "1.42.0", features = ["full"]}
 thiserror = "2.0.9"
-shuttle-axum = "0.50.0"
-shuttle-runtime = "0.50.0"
-axum = "0.7.4"
+shuttle-axum = "0.53.0"
+shuttle-runtime = "0.53.0"
+axum = "0.8.1"
 reqwest = "0.12.12"
 tower-http = {version = "0.6.2", features = ["timeout"]}
 bytes = "1.10.0"
