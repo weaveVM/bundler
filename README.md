@@ -175,12 +175,11 @@ use bundler::utils::core::super_account::SuperAccount;
 let super_account = SuperAccount::new()
     .keystore_path(".bundler_keystores".to_string())
     .pwd("weak-password".to_string()) // keystore pwd
-    .funder("private-key".to_string()) // the pk that will fund the chunkers
-    .build();
+    .funder("private-key".to_string()); // the pk that will fund the chunkers
 // create chunkers
-let _chunkers = super_account.create_chunkers(Some(256)).await.unwrap(); // Some(amount) of chunkers
+let chunkers = super_account.create_chunkers(256).await.unwrap(); // amountu32 of chunkers
 // fund chunkers (1 tWVM each)
-let _fund = super_account.fund_chunkers().await.unwrap(); // will fund each chunker by 1 tWVM
+let funded_accounts = chunkers.fund_chunkers().await.unwrap(); // will fund each chunker by 1 tWVM
 // retrieve chunkers
 let loaded_chunkers = super_account.load_chunkers(None).await.unwrap(); // None to load all chunkers
 ```
