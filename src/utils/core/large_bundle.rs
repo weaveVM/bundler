@@ -71,7 +71,6 @@ impl LargeBundle {
         self
     }
 
-    // TODO: add self.data max size check
     pub fn chunk(mut self) -> Self {
         let data = self
             .clone()
@@ -83,9 +82,11 @@ impl LargeBundle {
         // data limits safety check: min 1 byte - max 2GB
         assert!(data_len > 0 && data_len <= LB_SAFE_MAX_SIZE_LIMIT as u32);
 
-        let chunks_count =
-            data_len / LB_CHUNK_MAX_SIZE + ((data_len % LB_CHUNK_MAX_SIZE) / LB_CHUNK_MAX_SIZE);
-        let mut chunks = Vec::with_capacity(chunks_count.max(1) as usize); // ensure at least 1 chunk is counted when data_len < LB_CHUNK_MAX_SIZE
+        // let chunks_count =
+        //     data_len / LB_CHUNK_MAX_SIZE + ((data_len % LB_CHUNK_MAX_SIZE) / LB_CHUNK_MAX_SIZE);
+        let chunks_count = (data_len + LB_CHUNK_MAX_SIZE - 1) / LB_CHUNK_MAX_SIZE;
+
+        let mut chunks = Vec::with_capacity(chunks_count as usize); // ensure at least 1 chunk is counted when data_len < LB_CHUNK_MAX_SIZE
 
         for i in 0..chunks_count {
             let start = (i * LB_CHUNK_MAX_SIZE) as usize;
