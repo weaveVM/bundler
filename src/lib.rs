@@ -39,6 +39,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_send_bundle_to_load0() {
+        // will fail until a tWVM funded EOA (pk) is provided
+        let private_key =
+            String::from("6f142508b4eea641e33cb2a0161221105086a84584c74245ca463a49effea30b");
+
+        let mut envelopes: Vec<Envelope> = vec![];
+
+        let envelope_data = "hello world".as_bytes().to_vec();
+        let envelope = Envelope::new()
+            .data(Some(envelope_data))
+            .target(None)
+            .build()
+            .unwrap();
+        envelopes.push(envelope);
+
+        let bundle_tx = Bundle::new()
+            .private_key(private_key)
+            .envelopes(envelopes)
+            .build()
+            .expect("REASON")
+            .propagate_to_load0(None)
+            .await
+            .unwrap();
+        println!("{:?}", bundle_tx);
+        assert_eq!(bundle_tx.len(), 66);
+    }
+
+    #[tokio::test]
     async fn test_send_bundle_with_target() {
         // will fail until a tWVM funded EOA (pk) is provided
         let private_key =
