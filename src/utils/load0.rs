@@ -9,15 +9,14 @@ pub struct Load0UploadResponse {
     pub success: bool,
 }
 
-pub async fn upload_to_load0(data: Vec<u8>, content_type: &str, api_key: Option<String>) -> Result<String, Error> {
+pub async fn upload_to_load0(data: Vec<u8>, content_type: Option<String>, api_key: Option<String>) -> Result<String, Error> {
     let client = Client::new();
     let api_key = api_key.unwrap_or_default();
-
     let upload_url = format!("{}/upload", LOAD0_ENDPOINT_URL);
 
     let response = client
         .post(&upload_url)
-        .header("Content-Type", content_type)
+        .header("Content-Type", content_type.unwrap_or("octet-stream".to_string()))
         .header("X-Load-Authorization", api_key)
         .body(data)
         .send()
