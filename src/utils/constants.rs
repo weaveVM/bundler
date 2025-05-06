@@ -3,6 +3,7 @@ pub const BLOCK_GAS_LIMIT: u128 = 500_000_000;
 pub const GAS_PRIORITY_MULTIPLIER: f32 = 1.1; // 10%
 pub const TAGS_SIZE_LIMIT: usize = 2048; // in bytes;
 pub const WVM_RPC_URL: &str = "https://alphanet.load.network";
+pub const LOAD0_ENDPOINT_URL: &str = "https://load0.network";
 pub const ADDRESS_BABE1: &str = "0xbabe1d25501157043c7b4ea7CBC877B9B4D8A057";
 pub const ADDRESS_BABE2: &str = "0xbabe2dCAf248F2F1214dF2a471D77bC849a2Ce84";
 pub const LB_CHUNK_MAX_SIZE: u32 = 4_194_304; // 4MB
