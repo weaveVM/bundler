@@ -5,14 +5,16 @@ use crate::utils::server::api::{
 use axum::{routing::get, Router};
 use std::time::Duration;
 use tower_http::timeout::TimeoutLayer;
+use tokio::net::TcpListener;
 
 pub mod utils;
 
-#[shuttle_runtime::main]
-async fn main() -> shuttle_axum::ShuttleAxum {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let timeout_layer = TimeoutLayer::new(Duration::from_secs(3600));
+    
     // server routes
-    let router = Router::new()
+    let app = Router::new()
         .route("/", get(get_greet))
         // v1 routes
         .route("/v1/envelopes/{bundle_txid}", get(get_envelopes_of))
@@ -31,5 +33,14 @@ async fn main() -> shuttle_axum::ShuttleAxum {
         .route("/v2/resolve/{large_bundle_txid}", get(resolve_large_bundle))
         .layer(timeout_layer);
 
-    Ok(router.into())
+    // Get port from environment variable or default to 3000
+    let port = std::env::var("PORT").unwrap_or_else(|_| "3000".to_string());
+    let addr = format!("0.0.0.0:{}", port);
+    
+    println!("Server running on http://{}", addr);
+    
+    let listener = TcpListener::bind(&addr).await?;
+    axum::serve(listener, app).await?;
+    
+    Ok(())
 }
